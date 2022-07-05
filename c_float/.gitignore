@@ -1,0 +1,10 @@
+PaLD_test
+PaLD_par_test
+PaLD_vtune
+*.o
+*.optrpt
+*.dump
+*.bin
+*.dpi
+*.dyn
+*.txt
