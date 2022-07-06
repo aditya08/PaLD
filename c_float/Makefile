@@ -1,6 +1,6 @@
 CC = icc
-CFLAGS = -Ofast -Wall -ipo -qopenmp -xCORE-AVX512 -qopt-zmm-usage=high -DEBUG -DVECALIGN=64 -g
-LDFLAGS = -qopenmp -ipo -DEBUG -g
+CFLAGS = -Ofast -Wall -ipo -qopenmp -mtune=cascadelake -xCORE-AVX512 -qopt-zmm-usage=high -DEBUG -DVECALIGN=64 -g -fno-alias -fbuiltin -fargument-noalias -finline -finline-functions 
+LDFLAGS = -qopenmp -DEBUG -g 
 
 objects = kernels.o utils.o
 targets = PaLD_test PaLD_par_test PaLD_vtune

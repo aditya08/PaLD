@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; i++){
         memset(C2, 0, num_gen*sizeof(float));
         start = omp_get_wtime();
-        pald_openmp(D, 1, n, C2,omp_block_size, t);
+        pald_allz_openmp(D, 1, n, C2, omp_block_size, t);
         time_par = omp_get_wtime() - start;
         sum += time_par;
     }
@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; i++){
         memset(C1, 0, num_gen*sizeof(float));
         start = omp_get_wtime();
-        pald(D, 1, n, C1, seq_block_size);
+        pald_allz(D, 1, n, C1, seq_block_size);
         time_seq = omp_get_wtime() - start;
         sum += time_seq;
     }
@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
     }
     printf("Maximum difference: %1.1e \n", maxdiff);
 
-    printf("Seq time: %.3fs\nPar time: %.3fs\n",time_seq,time_par);
+    printf("Seq time: %.5fs\nPar time: %.5fs\n",time_seq,time_par);
     printf("Parallel speedup is %f, efficiency is %2.1f\n",time_seq/time_par,time_seq/time_par/t*100);
 
     _mm_free(D);

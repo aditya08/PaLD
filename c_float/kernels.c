@@ -10,7 +10,7 @@ beta in  conflict focus parameter: z is in focus of (x,y) if
 n    in  number of points
 C    out cohesion matrix: C(x,z) is z's support for x
 */
-void pald_orig(float *D, float beta, int n, float *C) {
+void pald_allz_orig(float *D, float beta, int n, float *C) {
     // input checking
     if (beta < 0)
         fprintf(stderr, "beta must be positive\n");
@@ -61,7 +61,7 @@ C    out cohesion matrix: C(x,z) is z's support for x
 Optimizations:
 Blocking, Masking, Auto-vectorization, 64-byte alignment, restrict pointers for D and C, and compiler flags.
 */
-void pald(float* restrict D, float beta, int n, float* restrict C, int block_size) {
+void pald_allz(float* restrict D, float beta, int n, float* restrict C, int block_size) {
     // declare indices
     int x, y, z, i, j, k, xb, yb, ib;
     float contains_tie;
@@ -77,7 +77,7 @@ void pald(float* restrict D, float beta, int n, float* restrict C, int block_siz
     float mask_z_in_x_cutoff = 0.f;
 
     float CYz_reduction = 0.f;
-    float cutoff_radius = 0.f;
+    float cutoff_distance = 0.f;
 
     __assume_aligned(C,VECALIGN);
     __assume_aligned(D,VECALIGN);
@@ -160,9 +160,9 @@ void pald(float* restrict D, float beta, int n, float* restrict C, int block_siz
                         contains_tie += mask_z_supports_x_and_y[i];
                     }
                     for (i = 0; i < ib; ++i){
-                        cutoff_radius = beta*distance_block[i + j * block_size];
-                        mask_z_in_x_cutoff = (DXz[i] <= cutoff_radius);
-                        mask_z_in_y_cutoff = (DYz[j] <= cutoff_radius);
+                        cutoff_distance = beta*distance_block[i + j * block_size];
+                        mask_z_in_x_cutoff = (DXz[i] <= cutoff_distance);
+                        mask_z_in_y_cutoff = (DYz[j] <= cutoff_distance);
                         mask_z_in_conflict_focus[i] = (mask_z_in_y_cutoff || mask_z_in_x_cutoff);
                     }
 
@@ -209,7 +209,7 @@ void pald(float* restrict D, float beta, int n, float* restrict C, int block_siz
 }
 
 
-void pald_openmp(float* restrict D, float beta, int n, float* restrict C, int block_size, int nthreads) {
+void pald_allz_openmp(float* restrict D, float beta, int n, float* restrict C, int block_size, int nthreads) {
     // declare indices
     // TODO: pragmas can't have curly braces in the same line!!!
 
@@ -232,7 +232,7 @@ void pald_openmp(float* restrict D, float beta, int n, float* restrict C, int bl
 
         for (x = 0; x <= y; x += block_size) {
             time_start = omp_get_wtime();
-            #pragma omp parallel for num_threads(nthreads) private(j, ib)
+            #pragma omp parallel for num_threads(nthreads) private(j, ib) schedule(monotonic:dynamic,8)
             for (j = 0; j < block_size; ++j) {
                 // distance_block(:,j) = D(x:x+xb,y+j) in off-diagonal case
                 ib = (x == y ? j : block_size); // handle diagonal blocks
@@ -244,7 +244,7 @@ void pald_openmp(float* restrict D, float beta, int n, float* restrict C, int bl
             memset(conflict_block, 0, block_size * block_size * sizeof(float)); // clear old values
 
             time_start = omp_get_wtime();
-            #pragma omp parallel for num_threads(nthreads) private(i, j, ib, z) reduction(+:conflict_block[:block_size*block_size]) schedule (dynamic)
+            #pragma omp parallel for num_threads(nthreads) private(i, j, ib, z) reduction(+:conflict_block[:block_size*block_size]) schedule(monotonic:dynamic,3)
             for (z = 0; z < n; ++z) {
                 float* DXz = D + x + z*n;
                 float* DYz = D + y + z*n;
@@ -277,10 +277,10 @@ void pald_openmp(float* restrict D, float beta, int n, float* restrict C, int bl
                 float mask_z_in_x_cutoff = 0.f;
 
                 float CYz_reduction = 0.f;
-                float cutoff_radius = 0.f;
+                float cutoff_distance = 0.f;
                 float contains_tie = 0.f;
        
-                #pragma omp for nowait schedule(dynamic)
+                #pragma omp for nowait schedule(monotonic:dynamic, 1)
                 for (z = 0; z < n; ++z) {
                 // loop over all (i,j) pairs in block
                     DXz = D + x + z*n;
@@ -301,9 +301,9 @@ void pald_openmp(float* restrict D, float beta, int n, float* restrict C, int bl
                             contains_tie += mask_z_supports_x_and_y[i];
                         }
                         for (i = 0; i < ib; ++i){
-                            cutoff_radius = beta*distance_block[i + j * block_size];
-                            mask_z_in_x_cutoff = (DXz[i] <= cutoff_radius);
-                            mask_z_in_y_cutoff = (DYz[j] <= cutoff_radius);
+                            cutoff_distance = beta*distance_block[i + j * block_size];
+                            mask_z_in_x_cutoff = (DXz[i] <= cutoff_distance);
+                            mask_z_in_y_cutoff = (DYz[j] <= cutoff_distance);
                             mask_z_in_conflict_focus[i] = (mask_z_in_y_cutoff || mask_z_in_x_cutoff);
                         }
                         CXz = C + x + z*n;
@@ -343,9 +343,9 @@ void pald_openmp(float* restrict D, float beta, int n, float* restrict C, int bl
     printf("OMP Loop Times, nthreads: %3d\n", nthreads);
     printf("==============================\n");
 
-    printf("memcpy loop time: %.3fs\n", memcpy_loop_time);
-    printf("conflict focus size loop time: %.3fs\n", conflict_loop_time);
-    printf("cohesion matrix update loop time: %.3fs\n\n", cohesion_loop_time);
+    printf("memcpy loop time: %.5fs\n", memcpy_loop_time);
+    printf("conflict focus size loop time: %.5fs\n", conflict_loop_time);
+    printf("cohesion matrix update loop time: %.5fs\n\n", cohesion_loop_time);
 
     // free up cache blocks
     _mm_free(distance_block);
@@ -363,7 +363,7 @@ C    out cohesion matrix: C(x,z) is z's support for x
 b    in  blocking parameter for cache efficiency
 t    in  number of OMP threads to use
 */
-void pald_opt_par(float *D, float beta, int n, float *C, const int b, int t) {
+void pald_allz_orig_openmp(float *D, float beta, int n, float *C, const int b, int t) {
 
     // pre-allocate conflict focus and distance cache blocks
     int *UXY = (int *) malloc(b * b * sizeof(int));

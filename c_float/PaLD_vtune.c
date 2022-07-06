@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
     //computing C with optimal block algorithm
     double start = omp_get_wtime();
     //for (int i = 0; i < 4; ++i)
-    pald_openmp(D, 1, n, C1, omp_block_size, nthreads);
+    pald_allz_openmp(D, 1, n, C1, omp_block_size, nthreads);
     double elapsed = omp_get_wtime() - start;
     
     //print out block algorithm result
