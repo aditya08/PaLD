@@ -25,14 +25,14 @@ void print_out(int n, float *C) {
 int main(int argc, char **argv) {
 
     //initializing testing environment spec
-    int n, omp_block_size, nthreads, i;
+    int n, block_size, nthreads, i;
     
     if ((argc != 3 && argc != 4) || !(n = atoi(argv[1]))) {
-        fprintf(stderr, "Usage: ./name distance_mat_size omp_block_size num_threads\n");
+        fprintf(stderr, "Usage: ./name distance_mat_size block_size num_threads\n");
         exit(-1);
     }
 
-    omp_block_size = atoi(argv[2]);
+    block_size = atoi(argv[2]);
     nthreads = atoi(argv[3]);
     unsigned int num_gen = n * n;
 
@@ -53,10 +53,12 @@ int main(int argc, char **argv) {
     FILE *f = fopen("dist_mat.bin", "wb");
     fwrite(D, sizeof(float), num_gen, f);
     fclose(f);
+    int ntrials = 5;
     //computing C with optimal block algorithm
     double start = omp_get_wtime();
     //for (int i = 0; i < 4; ++i)
-    pald_allz_openmp(D, 1, n, C1, omp_block_size, nthreads);
+    for(int i = 0; i < ntrials; ++i)
+        pald_allz(D, 1, n, C1, block_size);
     double elapsed = omp_get_wtime() - start;
     
     //print out block algorithm result
@@ -85,7 +87,7 @@ int main(int argc, char **argv) {
     }
     printf("Maximum difference: %1.1e \n", maxdiff);
     */
-    printf("%d Opt time: %.3fs\n", n, elapsed);
+    printf("%d Opt time: %.3fs\n", n, elapsed/ntrials);
    
     free(D);
     //free(C2);

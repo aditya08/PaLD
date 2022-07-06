@@ -30,6 +30,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; i++){
         memset(C2, 0, num_gen*sizeof(float));
         start = omp_get_wtime();
+        //pald_allz_orig_openmp(D, 1, n, C2, omp_block_size, t);
         pald_allz_openmp(D, 1, n, C2, omp_block_size, t);
         time_par = omp_get_wtime() - start;
         sum += time_par;
@@ -40,6 +41,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; i++){
         memset(C1, 0, num_gen*sizeof(float));
         start = omp_get_wtime();
+        //pald_allz_orig(D, 1, n, C1);
         pald_allz(D, 1, n, C1, seq_block_size);
         time_seq = omp_get_wtime() - start;
         sum += time_seq;
