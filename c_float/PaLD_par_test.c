@@ -12,7 +12,7 @@ int main(int argc, char **argv) {
 
     // initialize timers
     double start = 0.0, sum = 0.0, time_seq = 0.0 , time_par = 0.0;
-    int ntrials = 5;
+    int ntrials = 10;
     if ((argc != 5) || !(n = atoi(argv[1])) || !(seq_block_size = atoi(argv[2])) || !(omp_block_size = atoi(argv[3])) || !(t = atoi(argv[4])) ) {
         fprintf(stderr, "Usage: ./name mat_dim seq_block_size openmp_block_size num_threads\n");
         exit(-1);
@@ -26,15 +26,6 @@ int main(int argc, char **argv) {
     dist_mat_gen2D(D, n, 1, 10*n, 12345, '2');
 
     //computing C with parallel algorithm
-    sum = 0.;
-    for (int i = 0; i < ntrials; i++){
-        memset(C2, 0, num_gen*sizeof(float));
-        start = omp_get_wtime();
-        //pald_allz_orig_openmp(D, 1, n, C2, omp_block_size, t);
-        pald_allz_openmp(D, 1, n, C2, omp_block_size, t);
-        time_par = omp_get_wtime() - start;
-        sum += time_par;
-    }
     time_par = sum / ntrials;
     //computing C with sequential alg
     sum = 0.;
@@ -47,6 +38,15 @@ int main(int argc, char **argv) {
         sum += time_seq;
     }
     time_seq = sum / ntrials;
+    sum = 0.;
+    for (int i = 0; i < ntrials; i++){
+        memset(C2, 0, num_gen*sizeof(float));
+        start = omp_get_wtime();
+        //pald_allz_orig_openmp(D, 1, n, C2, omp_block_size, t);
+        pald_allz_openmp(D, 1, n, C2, omp_block_size, t);
+        time_par = omp_get_wtime() - start;
+        sum += time_par;
+    }
     // compute max norm error between two cohesion matrices
     float d, maxdiff = 0.;
     for (i = 0; i < num_gen; i++) {

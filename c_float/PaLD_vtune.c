@@ -53,11 +53,12 @@ int main(int argc, char **argv) {
     FILE *f = fopen("dist_mat.bin", "wb");
     fwrite(D, sizeof(float), num_gen, f);
     fclose(f);
-    int ntrials = 5;
+    int ntrials = 10;
     //computing C with optimal block algorithm
     double start = omp_get_wtime();
     //for (int i = 0; i < 4; ++i)
     for(int i = 0; i < ntrials; ++i)
+        // pald_allz_openmp(D, 1, n, C1, block_size,nthreads);
         pald_allz(D, 1, n, C1, block_size);
     double elapsed = omp_get_wtime() - start;
     

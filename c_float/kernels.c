@@ -81,17 +81,17 @@ void pald_allz(float* restrict D, float beta, int n, float* restrict C, int bloc
 
 
     // initialize pointers for cache-block subcolumn vectors
-    float *CXz, *CYz, *DXz, *DYz;
+    float *CXz;
+    float *CYz;
+    float *DXz;
+    float *DYz;
 
     int y_block, x_block, offset;
     float dist_cutoff = 0., dist_cutoff_tmp = 0.;
     double time_start = 0.0;
     double memops_loop_time = 0.0, conflict_loop_time = 0.0, cohesion_loop_time = 0.0;
     //up_left main block
-    __assume_aligned(C,VECALIGN);
-    __assume_aligned(D,VECALIGN);
-    __assume_aligned(conflict_block,VECALIGN);
-    __assume_aligned(distance_block,VECALIGN);
+
     for (y = 0; y < n; y += block_size) {
         // loop over blocks of points X = (x,...,x+b-1)
         y_block = (block_size < n - y ? block_size : n - y);
@@ -105,32 +105,41 @@ void pald_allz(float* restrict D, float beta, int n, float* restrict C, int bloc
             }
 
             // compute block's conflict focus sizes by looping over all points z
-            //memset(conflict_block, 0, block_size * block_size * sizeof(float)); // clear old values
-             for(k = 0; k < block_size*block_size; ++k)
-                 conflict_block[k] = 0.;
+            memset(conflict_block, 0, block_size * block_size * sizeof(float)); // clear old values
+            //  for(k = 0; k < block_size*block_size; ++k)
+            //      conflict_block[k] = 0.;
 
             memops_loop_time += omp_get_wtime() - time_start;
             time_start = omp_get_wtime();
             DXz = D + x;
             DYz = D + y; // init pointers to subcolumns of D
+            // __assume_aligned(conflict_block,64);
+            // __assume_aligned(distance_block,64);
+            // __assume(x_block % 16 == 0);
             for (z = 0; z < n; ++z) {
                 // DXz = D + x + z*n;
                 // DYz = D + y + z*n;
                 // loop over all (i,j) pairs in block
+                //_mm_prefetch(conflict_block + 128, 3);
                 for (j = 0; j < y_block; ++j) {
                     ib = (x == y ? j : x_block);
-                    offset = j * x_block;
+                    // __assume_aligned(DXz, VECALIGN);
+                    // __assume_aligned(distance_block, VECALIGN);
+                    //__assume(x_block % 16 == 0);
                     for (i = 0; i < ib; ++i) {
-                        // cutoff_distance = beta*distance_block[i + j * block_size];
-                        // mask_z_in_x_cutoff = (DXz[i] <= cutoff_distance);
-                        // mask_z_in_y_cutoff = (DYz[j] <= cutoff_distance);
-                        // conflict_block[i + j* block_size] += (mask_z_in_y_cutoff | mask_z_in_x_cutoff);
-                        if (DYz[j] <= beta * distance_block[i + offset] || DXz[i] <= beta * distance_block[i + offset]){
-                            ++conflict_block[i + offset];
+                        // cutoff_distance = beta*distance_block[i + j * x_block];
+                        // conflict_block[i + j * x_block] += ((DXz[i] <= cutoff_distance) | (DYz[j] <= cutoff_distance));
+                        if (DYz[j] <= beta * distance_block[i + j * x_block] || DXz[i] <= beta * distance_block[i + j * x_block]){
+                            ++conflict_block[i + j * x_block];
                             //mask_z_in_conflict_focus[i] = 1.0f;
                         }
             
                     }
+                    // __assume_aligned(conflict_block, VECALIGN);
+                    // __assume(x_block % 16 == 0);
+                    // for (i = 0; i < ib; ++i){
+                    //     conflict_block[i + j* x_block] += mask_z_in_conflict_focus[i];
+                    // }
                 
                 }
 
@@ -148,6 +157,9 @@ void pald_allz(float* restrict D, float beta, int n, float* restrict C, int bloc
             DYz = D + y; // init pointers to subcolumns of D
             CXz = C + x;
             CYz = C + y; // init pointers to subcolumns of C
+            // __assume(x_block % 16 == 0);
+            // __assume(x % 16 == 0);
+            // __assume(y % 16 == 0);
             for (z = 0; z < n; ++z) {
                 // loop over all (i,j) pairs in block
                 for (j = 0; j < y_block; ++j) {
@@ -156,18 +168,21 @@ void pald_allz(float* restrict D, float beta, int n, float* restrict C, int bloc
                     for (i = 0; i < ib; ++i) {
                         // mask_z_supports_x is when z support x.
                         mask_z_supports_x[i] = DXz[i] < DYz[j];
-                    }
-                    for (i = 0; i < ib; ++i) {
-                        // mask_z_supports_x_and_y is when z supports both x and y. Support should be divided between x and y.
-                        mask_z_supports_x_and_y[i] = DXz[i] == DYz[j] ? 1.0f : 0.0f;
-                        contains_tie += mask_z_supports_x_and_y[i];
-                    }
-                    for (i = 0; i < ib; ++i){
                         cutoff_distance = beta*distance_block[i + j * x_block];
                         mask_z_in_x_cutoff = (DXz[i] <= cutoff_distance);
                         mask_z_in_y_cutoff = (DYz[j] <= cutoff_distance);
                         mask_z_in_conflict_focus[i] = (mask_z_in_y_cutoff | mask_z_in_x_cutoff);
+                        mask_z_supports_x_and_y[i] = DXz[i] == DYz[j] ? 1.0f : 0.0f;
+                        contains_tie += mask_z_supports_x_and_y[i];
                     }
+                    // for (i = 0; i < ib; ++i) {
+                    //     // mask_z_supports_x_and_y is when z supports both x and y. Support should be divided between x and y.
+                        
+                    // }
+                    // // offset = j * x_block;
+                    // for (i = 0; i < ib; ++i){
+                        
+                    // }
 
                     // for (i = 0; i<ib; ++i){
                     //     CXz[i] +=  conflict_block[i + j * block_size]*mask_z_in_conflict_focus[i]*(mask_z_supports_x[i]);
@@ -175,6 +190,7 @@ void pald_allz(float* restrict D, float beta, int n, float* restrict C, int bloc
                     // }
                     
                     CYz_reduction = 0;
+                    // __assume_aligned(CXz,VECALIGN);
                     for (i =0; i<ib; ++i){
                         CXz[i] +=  conflict_block[i + j * x_block]*mask_z_in_conflict_focus[i]*(mask_z_supports_x[i]);
                         // 1 - mask_z_supports_x ==> z supports y and z supports both.
@@ -235,10 +251,7 @@ void pald_allz_openmp(float* restrict D, float beta, int n, float* restrict C, i
     float dist_cutoff = 0., dist_cutoff_tmp = 0.;
     int y_block, x_block;
     //up_left main block
-    __assume_aligned(C,VECALIGN);
-    __assume_aligned(D,VECALIGN);
-    __assume_aligned(conflict_block,VECALIGN);
-    __assume_aligned(distance_block,VECALIGN);
+
     for (y = 0; y < n; y += block_size) {
         // loop over blocks of points X = (x,...,x+b-1)
         y_block = (block_size < n - y ? block_size : n - y);
@@ -252,6 +265,9 @@ void pald_allz_openmp(float* restrict D, float beta, int n, float* restrict C, i
                 memcpy(distance_block + j * x_block, D + x + (y + j) * n, ib * sizeof(float));
             }
             // compute block's conflict focus sizes by looping over all points z
+            // #pragma omp parallel for num_threads(nthreads) private(k) schedule(static)
+            // for(k = 0; k < block_size*block_size; ++k)
+            //     conflict_block[k] = 0;
             memset(conflict_block, 0, block_size * block_size * sizeof(float)); // clear old values
             // #pragma omp parallel for num_threads(nthreads) private(k)
             // for(k = 0; k < block_size*block_size; ++k)
@@ -259,16 +275,17 @@ void pald_allz_openmp(float* restrict D, float beta, int n, float* restrict C, i
             memops_loop_time += omp_get_wtime() - time_start;
 
             time_start = omp_get_wtime();
+            __assume(x_block % 16 == 0); 
+            __assume(n % 16 == 0); 
             #pragma omp parallel for num_threads(nthreads) private(i, j, ib, z) reduction(+:conflict_block[:block_size*block_size]) schedule(monotonic:dynamic,3)
             for (z = 0; z < n; ++z) {
+
                 float* DXz = D + x + z*n;
                 float* DYz = D + y + z*n;
                 // loop over all (i,j) pairs in block
                 for (j = 0; j < y_block; ++j) {
                     ib = (x == y ? j : x_block);
-                     
                     for (i = 0; i < ib; ++i) {
-
                         if (DYz[j] <= beta * distance_block[i + j * x_block] || DXz[i] <= beta * distance_block[i + j * x_block]){
                             ++conflict_block[i + j * x_block];
                         }
@@ -277,7 +294,7 @@ void pald_allz_openmp(float* restrict D, float beta, int n, float* restrict C, i
             }
             conflict_loop_time += omp_get_wtime() - time_start;
 
-            // #pragma omp parallel for num_threads(nthreads) private(k) schedule(static,64)
+            //#pragma omp parallel for num_threads(nthreads) private(k) schedule(static)
             for (k=0;k<block_size*block_size; ++k)
                 conflict_block[k] = 1.0f/conflict_block[k];
 
@@ -295,9 +312,10 @@ void pald_allz_openmp(float* restrict D, float beta, int n, float* restrict C, i
                 float CYz_reduction = 0.f;
                 float cutoff_distance = 0.f;
                 float contains_tie = 0.f;
-       
+
                 #pragma omp for nowait schedule(monotonic:dynamic, 1)
                 for (z = 0; z < n; ++z) {
+
                 // loop over all (i,j) pairs in block
                     DXz = D + x + z*n;
                     DYz = D + y + z*n;
@@ -307,22 +325,25 @@ void pald_allz_openmp(float* restrict D, float beta, int n, float* restrict C, i
                         // z supports y+j
                         for (i = 0; i < ib; ++i) {
                             // mask_z_supports_x is when z support x.
-                            mask_z_supports_x[i]= DXz[i] < DYz[j]? 1.0f:0.0f;
+                            mask_z_supports_x[i]= DXz[i] < DYz[j];
                         }
                         for (i = 0; i < ib; ++i) {
                             // mask_z_supports_x_and_y is when z supports both x and y. Support should be divided between x and y.
                             mask_z_supports_x_and_y[i] = DXz[i] == DYz[j] ? 1.0f:0.0f;
                             contains_tie += mask_z_supports_x_and_y[i];
                         }
+                        // __assume(x_block % 16 == 0);
+                        // __assume(n % 16 == 0);
                         for (i = 0; i < ib; ++i){
-                            cutoff_distance = beta*distance_block[i + j * x_block];
+                            cutoff_distance = beta * distance_block[i + j * x_block];
                             mask_z_in_x_cutoff = (DXz[i] <= cutoff_distance);
                             mask_z_in_y_cutoff = (DYz[j] <= cutoff_distance);
                             mask_z_in_conflict_focus[i] = (mask_z_in_y_cutoff | mask_z_in_x_cutoff);
                         }
                         CXz = C + x + z*n;
                         CYz = C + y + z*n;
-
+                        // __assume(x_block % 16 == 0);
+                        // __assume(n % 16 == 0);
                         CYz_reduction = 0.f;
                         for (i = 0; i<ib; ++i){
                             CXz[i] += conflict_block[i + j * x_block]*mask_z_in_conflict_focus[i]*(mask_z_supports_x[i]);
