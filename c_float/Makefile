@@ -1,5 +1,5 @@
 CC = icc
-CFLAGS = -Ofast -Wall -ipo -qopenmp -mtune=cascadelake -xCORE-AVX512 -qopt-zmm-usage=high -DEBUG -DVECALIGN=64 -g -fno-alias -fbuiltin -fargument-noalias -finline -finline-functions 
+CFLAGS = -Ofast -Wall -ipo -qopenmp -mtune=cascadelake -xCORE-AVX512 -qopt-zmm-usage=high -DEBUG -DVECALIGN=64 -g -fno-alias -fbuiltin -fargument-noalias -finline -finline-functions -qopt-report-phase=vec -qopt-report=5 -qopt-report-file=vecreport.optrpt
 LDFLAGS = -qopenmp -DEBUG -g 
 
 objects = kernels.o utils.o
