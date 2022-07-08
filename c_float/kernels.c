@@ -74,9 +74,8 @@ void pald_allz(float* restrict D, float beta, int n, float* restrict C, int bloc
 
     char mask_z_in_y_cutoff  = 0;
     char mask_z_in_x_cutoff = 0;
-    float contains_tie = 0.f;
 
-    float CYz_reduction = 0.f;
+    float CYz_reduction = 0.f, contains_tie = 0.f;
     float cutoff_distance = 0.f;
 
 
@@ -125,7 +124,7 @@ void pald_allz(float* restrict D, float beta, int n, float* restrict C, int bloc
                     ib = (x == y ? j : x_block);
                     // __assume_aligned(DXz, VECALIGN);
                     // __assume_aligned(distance_block, VECALIGN);
-                    //__assume(x_block % 16 == 0);
+                    // __assume(x_block % 16 == 0);
                     for (i = 0; i < ib; ++i) {
                         // cutoff_distance = beta*distance_block[i + j * x_block];
                         // conflict_block[i + j * x_block] += ((DXz[i] <= cutoff_distance) | (DYz[j] <= cutoff_distance));
@@ -157,28 +156,35 @@ void pald_allz(float* restrict D, float beta, int n, float* restrict C, int bloc
             DYz = D + y; // init pointers to subcolumns of D
             CXz = C + x;
             CYz = C + y; // init pointers to subcolumns of C
-            // __assume(x_block % 16 == 0);
-            // __assume(x % 16 == 0);
-            // __assume(y % 16 == 0);
+
+            
             for (z = 0; z < n; ++z) {
                 // loop over all (i,j) pairs in block
+                
                 for (j = 0; j < y_block; ++j) {
                     ib = (x == y ? j : x_block); 
+                    int offset = j * x_block;
                     // z supports y+j
+                    // __assume_aligned(distance_block,VECALIGN);
+                    // __assume_aligned(DXz,VECALIGN);
+                    // __assume(offset % 16 == 0);
+                    // __assume(n % 16 == 0);
                     for (i = 0; i < ib; ++i) {
                         // mask_z_supports_x is when z support x.
                         mask_z_supports_x[i] = DXz[i] < DYz[j];
-                        cutoff_distance = beta*distance_block[i + j * x_block];
+                        cutoff_distance = beta*distance_block[i + offset];
                         mask_z_in_x_cutoff = (DXz[i] <= cutoff_distance);
                         mask_z_in_y_cutoff = (DYz[j] <= cutoff_distance);
                         mask_z_in_conflict_focus[i] = (mask_z_in_y_cutoff | mask_z_in_x_cutoff);
+
+                    }
+                    // __assume_aligned(mask_z_supports_x_and_y, VECALIGN);
+                    // __assume(n % 16 == 0);
+                    for (i = 0; i < ib; ++i) {
+                    //     // mask_z_supports_x_and_y is when z supports both x and y. Support should be divided between x and y.
                         mask_z_supports_x_and_y[i] = DXz[i] == DYz[j] ? 1.0f : 0.0f;
                         contains_tie += mask_z_supports_x_and_y[i];
                     }
-                    // for (i = 0; i < ib; ++i) {
-                    //     // mask_z_supports_x_and_y is when z supports both x and y. Support should be divided between x and y.
-                        
-                    // }
                     // // offset = j * x_block;
                     // for (i = 0; i < ib; ++i){
                         
@@ -190,11 +196,15 @@ void pald_allz(float* restrict D, float beta, int n, float* restrict C, int bloc
                     // }
                     
                     CYz_reduction = 0;
+                    // __assume(offset % 16 == 0);
+                    // __assume(n % 16 == 0);
                     // __assume_aligned(CXz,VECALIGN);
+                    // __assume_aligned(CYz,VECALIGN);                    
+                    // __assume_aligned(conflict_block,VECALIGN);                    
                     for (i =0; i<ib; ++i){
-                        CXz[i] +=  conflict_block[i + j * x_block]*mask_z_in_conflict_focus[i]*(mask_z_supports_x[i]);
+                        CXz[i] +=  conflict_block[i + offset]*mask_z_in_conflict_focus[i]*(mask_z_supports_x[i]);
                         // 1 - mask_z_supports_x ==> z supports y and z supports both.
-                        CYz_reduction +=  conflict_block[i + j * x_block]*mask_z_in_conflict_focus[i]*(1 - mask_z_supports_x[i]);
+                        CYz_reduction +=  conflict_block[i + offset]*mask_z_in_conflict_focus[i]*(1 - mask_z_supports_x[i]);
                     }
                     CYz[j] += CYz_reduction;
 

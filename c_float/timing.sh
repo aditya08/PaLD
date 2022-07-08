@@ -1,9 +1,10 @@
 #!/bin/bash
-
-for matrix_size in 500 1000 1500 2000 2500 3000 3500 4000 4500 5000
+export OMP_PROC_BIND=true
+for matrix_size in 1024 2048 4096 8192
 do
-    for cache_size in 256
+    for nthreads in 2 4 8 16 32
     do
-	./PaLD_test $matrix_size $cache_size >> new.txt
+	./PaLD_par_test $matrix_size 256 256 $nthreads 2>&1 | tee strong_scaling.txt
+    sleep 2
     done
 done

@@ -36,9 +36,9 @@ int main(int argc, char **argv) {
     nthreads = atoi(argv[3]);
     unsigned int num_gen = n * n;
 
-    float *C1 = calloc(num_gen, sizeof(float));
+    float *C1 = (float *) _mm_malloc(num_gen*sizeof(float),VECALIGN);//calloc(num_gen, sizeof(float));
     //float *C2 = calloc(num_gen, sizeof(float));
-    float *D = malloc(sizeof(float) * num_gen);
+    float *D = (float *) _mm_malloc(num_gen*sizeof(float),VECALIGN);
     dist_mat_gen2D(D, n, 1, 10*n, 12345, '2');
 
     //print out dist matrix
@@ -53,14 +53,18 @@ int main(int argc, char **argv) {
     FILE *f = fopen("dist_mat.bin", "wb");
     fwrite(D, sizeof(float), num_gen, f);
     fclose(f);
-    int ntrials = 10;
+    int ntrials = 5;
+    double start = 0., elapsed = 0.;
     //computing C with optimal block algorithm
-    double start = omp_get_wtime();
     //for (int i = 0; i < 4; ++i)
-    for(int i = 0; i < ntrials; ++i)
+    for(i = 0; i < ntrials; ++i){
         // pald_allz_openmp(D, 1, n, C1, block_size,nthreads);
+        memset(C1, 0, num_gen*sizeof(float));
+        start = omp_get_wtime();
         pald_allz(D, 1, n, C1, block_size);
-    double elapsed = omp_get_wtime() - start;
+        elapsed += omp_get_wtime() - start;
+
+    }
     
     //print out block algorithm result
     //print_out(n, C);
@@ -90,7 +94,7 @@ int main(int argc, char **argv) {
     */
     printf("%d Opt time: %.3fs\n", n, elapsed/ntrials);
    
-    free(D);
+    _mm_free(D);
     //free(C2);
-    free(C1);
+    _mm_free(C1);
 }
