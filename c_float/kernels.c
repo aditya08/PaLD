@@ -10,7 +10,7 @@ beta in  conflict focus parameter: z is in focus of (x,y) if
 n    in  number of points
 C    out cohesion matrix: C(x,z) is z's support for x
 */
-void pald_allz_orig(float *D, float beta, int n, float *C) {
+void pald_allz_naive(float *D, float beta, int n, float *C) {
     // input checking
     if (beta < 0)
         fprintf(stderr, "beta must be positive\n");
@@ -410,7 +410,7 @@ C    out cohesion matrix: C(x,z) is z's support for x
 b    in  blocking parameter for cache efficiency
 t    in  number of OMP threads to use
 */
-void pald_allz_orig_openmp(float *D, float beta, int n, float *C, const int b, int t) {
+void pald_allz_naive_openmp(float *D, float beta, int n, float *C, const int b, int t) {
 
     // pre-allocate conflict focus and distance cache blocks
     int *UXY = (int *) malloc(b * b * sizeof(int));
@@ -519,6 +519,21 @@ void pald_allz_orig_openmp(float *D, float beta, int n, float *C, const int b, i
     // free up cache blocks
     free(DXY);
     free(UXY);
-
     // print out timing results before returning
+}
+
+void pald_triplet_naive(float *D, float beta, int n, float *C){
+    //TODO: Naive sequential triplet code.
+}
+
+void pald_triplet_naive_openmp(float *D, float beta, int n, float *C, int num_threads){
+    //TODO: Naive OpenMP triplet code.
+}
+
+void pald_triplet(float *D, float beta, int n, float *C, int block_size){
+    //TODO: Optimized sequential triplet code.
+}
+
+void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, int num_threads){
+    //TODO: Optimized OpenMP triplet code.
 }

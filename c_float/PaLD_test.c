@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
     
     start = clock();
     //for (int i = 0; i < 4; ++i)
-    pald_allz_orig(D, 1, n, C2);
+    pald_allz_naive(D, 1, n, C2);
     diff = clock() - start;
     double msec_orig = 1. * diff / CLOCKS_PER_SEC;
 
