@@ -4,7 +4,7 @@ CFLAGS = -Ofast -Wall -ipo -qopenmp -mtune=cascadelake -xCORE-AVX512 -qopt-zmm-u
 LDFLAGS = -qopenmp -DEBUG -g 
 
 objects = kernels.o utils.o
-targets = PaLD_test PaLD_par_test PaLD_vtune PaLD_triplet_test
+targets = PaLD_test PaLD_par_test PaLD_vtune PaLD_triplet_test PaLD_triplet_par_test
 
 .PHONY : default
 default: $(targets)
@@ -22,6 +22,9 @@ PaLD_par_test : PaLD_par_test.o $(objects)
 	$(CC) $^ -o $@ $(LDFLAGS) 
 
 PaLD_triplet_test : PaLD_triplet_test.o $(objects)
+	$(CC) $^ -o $@ $(LDFLAGS) 
+
+PaLD_triplet_par_test : PaLD_triplet_par_test.o $(objects)
 	$(CC) $^ -o $@ $(LDFLAGS) 
 
 %.o : %.c %.h

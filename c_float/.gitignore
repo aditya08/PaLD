@@ -1,6 +1,7 @@
 PaLD_test
 PaLD_par_test
 PaLD_triplet_test
+PaLD_triplet_par_test
 PaLD_vtune
 *.o
 *.optrpt
