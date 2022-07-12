@@ -12,14 +12,16 @@ void print_out(int n, float *C) {
     printf("\n");
     int i, j;
     register int temp;
+    printf("[\n");
     for (i = 0; i < n; i++) {
         for (j = 0; j < n; j++) {
             temp = j * n + i;
             C[temp] /= (n - 1);
             printf("%.7f ", C[temp]);
         }
-        printf("\n");
+        printf(";\n");
     }
+    printf("]\n");
 }
 
 int main(int argc, char **argv) {
@@ -44,27 +46,30 @@ int main(int argc, char **argv) {
     dist_mat_gen2D(D, n, 1, 10*n, 12345, '2');
 
     //print out dist matrix
-    printf("[\n");
-    for (i = 0; i < num_gen; i++) {
+    // printf("[\n");
+    // for (i = 0; i < num_gen; i++) {
 
-        if (i % n == 0 && i > 0) {
-            printf(";\n");
-        }
-        printf("%.2f ", D[i]);
-    }
-    printf("]\n");
+    //     if (i % n == 0 && i > 0) {
+    //         printf(";\n");
+    //     }
+    //     printf("%.2f ", D[i]);
+    // }
+    // printf("]\n");
     FILE *f = fopen("dist_mat.bin", "wb");
     fwrite(D, sizeof(float), num_gen, f);
     fclose(f);
+    int ntrials = 5;
     //computing C with optimal block algorithm
-    clock_t start = clock();
-    //for (int i = 0; i < 4; ++i)
-    pald_triplet_naive(D, 1, n, C1);
-    clock_t diff = clock() - start;
-    double  msec_opt = 1. * diff / CLOCKS_PER_SEC;
+    double start = 0., naive_time = 0.;
+    for (int i = 0; i < ntrials; ++i){
+        memset(C1, 0, sizeof(float)*n*n);
+        start = omp_get_wtime();
+        pald_triplet_naive(D, 1, n, C1);
+        naive_time += omp_get_wtime() - start;
+    }
     
     //print out block algorithm result
-    print_out(n, C1);
+    // print_out(n, C1);
 
 
     //computing C with original algorithm  
@@ -89,7 +94,7 @@ int main(int argc, char **argv) {
     // }
     // printf("Maximum difference: %1.1e \n", maxdiff);
 
-    // printf("%d  Orig time: %.3fs  Opt time: %.3fs\n", n, msec_orig, msec_opt);
+    printf("%d  Naive time: %.3fs\n", n, naive_time/ntrials);
    
     _mm_free(D);
     _mm_free(C2);
