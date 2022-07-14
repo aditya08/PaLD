@@ -633,12 +633,12 @@ void pald_triplet_naive(float *D, float beta, int n, float *C){
     printf("cohesion matrix update loop time: %.5fs\n\n", cohesion_loop_time);
 }   
 
-void pald_triplet_naive_openmp(float *D, float beta, int n, float *C, int num_threads){
+void pald_triplet_naive_openmp(float *D, float beta, int n, float *C, int nthreads){
     //TODO: Naive OpenMP triplet code.
         //TODO: Naive sequential triplet code.
     float* conflict_matrix = (float *)  malloc(n * n * sizeof(float));
     memset(conflict_matrix, 0, n * n * sizeof(float));
-
+    long int len = n * n;
     double conflict_loop_time, cohesion_loop_time;
     double time_start = omp_get_wtime();
     for (int i = 0; i < n; ++i){
@@ -651,7 +651,8 @@ void pald_triplet_naive_openmp(float *D, float beta, int n, float *C, int num_th
     }
     // print_matrix(n,conflict_matrix);
     // Compute conflict focus size.
-    #pragma omp parallel for num_threads(num_threads) reduction(+:conflict_matrix[n*n])
+    // printf("conflict_matrix start.\n");
+    #pragma omp parallel for num_threads(nthreads) reduction(+:conflict_matrix[:len])
     for(int x = 0; x < n - 1; ++x){
         for(int y = x + 1; y < n; ++y){
             for(int z = y + 1; z < n; ++z){
@@ -671,6 +672,7 @@ void pald_triplet_naive_openmp(float *D, float beta, int n, float *C, int num_th
 
         }
     }
+    // printf("conflict_matrix done.\n");
     conflict_loop_time = omp_get_wtime() - time_start;
     time_start = omp_get_wtime();
     // print_matrix(n,conflict_matrix);
@@ -688,7 +690,7 @@ void pald_triplet_naive_openmp(float *D, float beta, int n, float *C, int num_th
     // }
 
     // Compute cohesion matrix.
-    #pragma omp parallel for num_threads(num_threads) reduction(+:C[n*n])
+    #pragma omp parallel for num_threads(nthreads) reduction(+:C[:len])
     for(int x = 0; x < n - 1; ++x){
         for(int y = x + 1; y < n; ++y){
             for(int z = y + 1; z < n; ++z){
@@ -717,7 +719,7 @@ void pald_triplet_naive_openmp(float *D, float beta, int n, float *C, int num_th
     // print_matrix(n, C);
 
     printf("====================================================\n");
-    printf("Naive Triplet OMP Loop Times %d\n threads:", num_threads);
+    printf("Naive Triplet OMP Loop Times threads: %d\n", nthreads);
     printf("====================================================\n");
 
     // printf("memops loop time: %.5fs\n", memops_loop_time);

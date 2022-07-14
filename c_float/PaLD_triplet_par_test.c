@@ -27,10 +27,10 @@ void print_out(int n, float *C) {
 int main(int argc, char **argv) {
 
     //initializing testing environment spec
-    int n, cache_size, i;
+    int n, cache_size, i, nthreads;
     
-    if ((argc != 2 && argc != 3) || !(n = atoi(argv[1]))) {
-        fprintf(stderr, "Usage: ./name distance_mat_size block_size\n");
+    if ((argc != 2 && argc != 3) || !(n = atoi(argv[1])) || !(nthreads = atoi(argv[2]))) {
+        fprintf(stderr, "Usage: ./name distance_mat_size num_threads\n");
         exit(-1);
     }
 
@@ -60,13 +60,21 @@ int main(int argc, char **argv) {
     fclose(f);
     int ntrials = 5;
     //computing C with optimal block algorithm
-    double start = 0., naive_time = 0.;
+    double start = 0., naive_time = 0., omp_time = 0.;
     for (int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
         pald_triplet_naive(D, 1, n, C1);
         naive_time += omp_get_wtime() - start;
     }
+
+    for (int i = 0; i < ntrials; ++i){
+        memset(C2, 0, sizeof(float)*n*n);
+        start = omp_get_wtime();
+        pald_triplet_naive_openmp(D, 1, n, C2, nthreads);
+        omp_time += omp_get_wtime() - start;
+    }
+    
     
     //print out block algorithm result
     // print_out(n, C1);
@@ -87,15 +95,22 @@ int main(int argc, char **argv) {
 
     // compute max norm error between two cohesion matrices
     
-    // float d, maxdiff = 0.;
-    // for (i = 0; i < num_gen; i++) {
-    //     d = fabs(C1[i]-C2[i]);
-    //     maxdiff = d > maxdiff ? d : maxdiff;
-    // }
+    float d, maxdiff = 0.;
+    for (i = 0; i < num_gen; i++) {
+        d = fabs(C1[i]-C2[i]);
+        maxdiff = d > maxdiff ? d : maxdiff;
+    }
     // printf("Maximum difference: %1.1e \n", maxdiff);
 
-    printf("%d  Naive time: %.3fs\n", n, naive_time/ntrials);
-   
+    printf("=============================================\n");
+    printf("           Summary, n: %d\n", n);
+    printf("=============================================\n");
+    printf("Avg. Sequential time: %.5fs\n",naive_time);
+    printf("Avg. Parallel   time: %.5fs, nthreads: %d\n", omp_time, nthreads);
+    printf("Speedup: %.2f\n",naive_time/omp_time);
+    printf("Parallel Efficiency: %2.2f\n", naive_time/omp_time/nthreads*100);
+    printf("Maximum difference: %1.1e\n\n", maxdiff);
+
     _mm_free(D);
     _mm_free(C2);
     _mm_free(C1);
