@@ -17,7 +17,7 @@ n = size(D,1);
 C = zeros(n);
 F = zeros(n);
 
-
+ties = 0;
 for x = 1:(n-1)
     for y = (x+1):n
      
@@ -33,20 +33,17 @@ for x = 1:(n-1)
         zy = dx > dy; % z's closer to y
         u_size = sum(uxy);
         F(x,y) = u_size;
-        
+        % fprintf("%d\n",sum(zz))
         % assign local depth value to the corresponding position in C
         C(x,zx & uxy) = C(x,zx & uxy) + 1/u_size; 
         C(x,zz & uxy) = C(x,zz & uxy) + .5/u_size;
         C(y,zy & uxy) = C(y,zy & uxy) + 1/u_size;
         C(y,zz & uxy) = C(y,zz & uxy) + .5/u_size;
-      
     end
 end
-
 % convert summed local depth to cohesion matrix
 C = C/(n-1);
 F = F + F';
-
 end
 
 

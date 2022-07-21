@@ -1,4 +1,4 @@
-function [C,U] = pald_triplet_block(D,b)
+function [C,U] = pald_triplet_block2(D,b)
 
 
 if D' ~= D 
@@ -18,29 +18,39 @@ for x = 1:b:n
         Yb = y:min(y+b-1,n);
         for z = y:b:n
             Zb = z:min(z+b-1,n);
-            
+            [UXY,UXZ,UYZ] = ...
+            update_cfs(x, y, z, D(Xb,Yb), D(Xb,Zb), D(Yb,Zb));
             if x == y && y == z
-                [U(Xb,Yb)] = update_cfs(U(Xb,Yb),D(Xb,Yb));
+%                 U(Xb, Yb) = UXY + UXZ + UYZ;
+                U(Xb, Yb) = U(Xb, Yb) + UXY + UXZ + UYZ;
 %                 Xb
 %                 Yb
-%                 U(Xb,Yb)
+%                 UXY
+%                 [U(Xb,Yb)] = update_cfs(U(Xb,Yb),D(Xb,Yb));
             elseif x == y
-                [U(Xb,Yb),U(Xb,Zb)] = update_cfs1(U(Xb,Yb),U(Xb,Zb),D(Xb,Yb),D(Xb,Zb));
-%                 U(Xb,Yb)
-%                 U(Xb,Zb)
+                U(Xb,Yb) = U(Xb,Yb) + UXY;
+                U(Xb,Zb) = U(Xb,Zb) + UXZ + UYZ;
+%                 UXY
+%                 UXZ
+%                 [U(Xb,Yb),U(Xb,Zb)] = update_cfs1(U(Xb,Yb),U(Xb,Zb),D(Xb,Yb),D(Xb,Zb));
             elseif y == z
-                [U(Xb,Zb),U(Yb,Zb)] = update_cfs2(U(Xb,Zb),U(Yb,Zb),D(Xb,Zb),D(Yb,Zb));
-%                 U(Xb, Zb)
-%                 U(Yb, Zb)
-
+                U(Xb,Zb) = U(Xb,Zb) + UXY + UXZ;
+                U(Yb,Zb) = U(Yb,Zb) + UYZ;
+%                 UXZ
+%                 UYZ
+%                 [U(Xb,Zb),U(Yb,Zb)] = update_cfs2(U(Xb,Zb),U(Yb,Zb),D(Xb,Zb),D(Yb,Zb));
             else
-                [U(Xb,Yb),U(Xb,Zb),U(Yb,Zb)] = ...
-            update_cfs3(U(Xb,Yb),U(Xb,Zb),U(Yb,Zb),D(Xb,Yb),D(Xb,Zb),D(Yb,Zb));
+                U(Xb,Yb) = U(Xb,Yb) + UXY;
+                U(Xb,Zb) = U(Xb,Zb) + UXZ;
+                U(Yb,Zb) = U(Yb,Zb) + UYZ;
+%                 [U(Xb,Yb),U(Xb,Zb),U(Yb,Zb)] = ...
+%             update_cfs3(U(Xb,Yb),U(Xb,Zb),U(Yb,Zb),D(Xb,Yb),D(Xb,Zb),D(Yb,Zb));
             end
             
         end
     end
 end
+
 
 % fill in lower triangle of U
  U = U + U';
@@ -60,24 +70,26 @@ for x = 1:b:n
         Yb = y:min(y+b-1,n);
         for z = y:b:n
             Zb = z:min(z+b-1,n);
-            
+            [CXY,CXZ,CYZ,CYX,CZX,CZY] = ...
+            update_coh3(x, y, z, U(Xb,Yb),U(Xb,Zb),U(Yb,Zb),D(Xb,Yb),D(Xb,Zb),D(Yb,Zb));
             if x == y && y == z
-                [C(Xb,Yb)] = update_coh(U(Xb,Yb),D(Xb,Yb),C(Xb,Yb));
+                C(Xb,Yb) = C(Xb,Yb) + CXY + CYX + CXZ + CZX + CYZ + CZY;
             elseif x == y
-                
-                [C(Xb,Yb),C(Xb,Zb),C(Zb,Xb)] = ...
-                    update_coh1(U(Xb,Yb),U(Xb,Zb),D(Xb,Yb),D(Xb,Zb),C(Xb,Yb),C(Xb,Zb),C(Zb,Xb));
-                
+                C(Xb,Yb) = C(Xb,Yb) + CXY + CYX;
+                C(Xb,Zb) = C(Xb,Zb) + CXZ + CYZ;
+                C(Zb,Xb) = C(Zb,Xb) + CZX + CZY;
             elseif y == z
-
-                [C(Xb,Zb),C(Yb,Zb),C(Zb,Xb)] = ...
-                    update_coh2(U(Xb,Zb),U(Yb,Zb),D(Xb,Zb),D(Yb,Zb),C(Xb,Zb),C(Yb,Zb),C(Zb,Xb));
-               
+                C(Xb,Zb) = C(Xb,Zb) + CXZ + CXY;
+                C(Yb,Zb) = C(Yb,Zb) + CYZ + CZY;
+                C(Zb,Xb) = C(Zb,Xb) + CZX + CYX;
             else
-                [C(Xb,Yb),C(Xb,Zb),C(Yb,Zb),C(Yb,Xb),C(Zb,Xb),C(Zb,Yb)] = ...
-            update_coh3(U(Xb,Yb),U(Xb,Zb),U(Yb,Zb),D(Xb,Yb),D(Xb,Zb),D(Yb,Zb),C(Xb,Yb),C(Xb,Zb),C(Yb,Zb),C(Yb,Xb),C(Zb,Xb),C(Zb,Yb));
+                C(Xb,Yb) = C(Xb,Yb) + CXY;
+                C(Xb,Zb) = C(Xb,Zb) + CXZ;
+                C(Yb,Zb) = C(Yb,Zb) + CYZ;
+                C(Yb,Xb) = C(Yb,Xb) + CYX;
+                C(Zb,Xb) = C(Zb,Xb) + CZX;
+                C(Zb,Yb) = C(Zb,Yb) + CZY;
             end
-            
             C/(n-1);
         end
     end
@@ -86,113 +98,44 @@ end
 C = C/(n-1);
 end
 
-function [Uxy] = update_cfs(Uxy,Dxy)
-% update conflict focus sizes for triplets when x == y == z
-
-    [n,~] = size(Dxy); % m is the size of X block, n is the size of Y block
-
-     % consider all unique triplets to compute conflict focus sizes
-    for x = 1:(n-1)
-        for y = (x+1):n
-            for z = (y+1):n
-                if Dxy(x,y) < Dxy(x,z) && Dxy(x,y) < Dxy(y,z)     % xy is closest pair
-                    Uxy(x,z) = Uxy(x,z) + 1;
-                    Uxy(y,z) = Uxy(y,z) + 1;
-                elseif Dxy(x,z) < Dxy(x,y) && Dxy(x,z) < Dxy(y,z) % xz is closest pair
-                    Uxy(x,y) = Uxy(x,y) + 1;
-                    Uxy(y,z) = Uxy(y,z) + 1;
-                else                                      % yz is closest pair
-                    Uxy(x,y) = Uxy(x,y) + 1;
-                    Uxy(x,z) = Uxy(x,z) + 1;
-                end
-            end
-        end
-    end
-    
-end
-
-function [Uxy,Uxz] = update_cfs1(Uxy,Uxz,Dxy,Dxz)
-% update conflict focus sizes for triplets when x == y 
-
-% problem when x == y  and z = x + b, and Uxy is in the diagonal part
-    [m,n] = size(Dxz); 
-    
-    for x = 1:m
-        for y=(x+1):m
-            for z=1:n
-
-                if Dxy(x,y) < Dxz(x,z) && Dxy(x,y) < Dxz(y,z)     % xy is closest pair
-                    Uxz(x,z) = Uxz(x,z) + 1;
-                    Uxz(y,z) = Uxz(y,z) + 1;
-                elseif Dxz(x,z) < Dxy(x,y) && Dxz(x,z) < Dxz(y,z) % xz is closest pair
-                    Uxy(x,y) = Uxy(x,y) + 1;
-                    Uxz(y,z) = Uxz(y,z) + 1;
-                else                                      % yz is closest pair
-                    Uxy(x,y) = Uxy(x,y) + 1;
-                    Uxz(x,z) = Uxz(x,z) + 1;
-                end
-                
-
-            end
-         end
-     end
-    
-
-end
-
-function [Uxz,Uyz] = update_cfs2(Uxz,Uyz,Dxz,Dyz)
-% update conflict focus sizes for triplets when y == z 
-
-    [m,n] = size(Dxz);
-     for x = 1:m
-        for y = 1:n
-            for z = (y+1):n
-                if Dxz(x,y) < Dxz(x,z) && Dxz(x,y) < Dyz(y,z)     % xy is closest pair
-                    Uxz(x,z) = Uxz(x,z) + 1;
-                    Uyz(y,z) = Uyz(y,z) + 1;
-                elseif Dxz(x,z) < Dxz(x,y) && Dxz(x,z) < Dyz(y,z) % xz is closest pair
-                    Uxz(x,y) = Uxz(x,y) + 1;
-                    Uyz(y,z) = Uyz(y,z) + 1;
-                else                                      % yz is closest pair
-                    Uxz(x,y) = Uxz(x,y) + 1;
-                    Uxz(x,z) = Uxz(x,z) + 1;
-                end
-%                 Uxz
-%                 Uyz
-
-            end
-         end
-     end
-end
-
-function [Uxy,Uxz,Uyz] = update_cfs3(Uxy,Uxz,Uyz,Dxy,Dxz,Dyz)
-% update conflict focus sizes for triplets when none of x, y, and z are
-% equal
+function [Uxy,Uxz,Uyz] = update_cfs(xb, yb, zb, Dxy, Dxz, Dyz)
+% update conflict focus sizes for triplets.
 
     [m,n] = size(Dxy);
     [~,p] = size(Dxz);
-    
-    for x = 1:m
-        for y=1:n
-            for z=1:p
-                
-                if Dxy(x,y) < Dxz(x,z) && Dxy(x,y) < Dyz(y,z)     % xy is closest pair
+ 
+    Uxy = zeros(m,n);
+    Uxz = zeros(m,p);
+    Uyz = zeros(n,p);
+
+    xend = m;
+    ystart = 1;
+    zstart = 1;
+    if (xb == yb) && (yb == zb)
+        xend = m - 1;
+    end
+    for x = 1:xend
+        if xb == yb
+            ystart = x + 1;
+        end
+        for y=ystart:n
+            if yb == zb
+                zstart = y + 1;
+            end
+            for z=zstart:p
+                if Dxy(x,y) < Dxz(x,z) && Dxy(x,y) < Dyz(y,z)       % xy is closest pair
                     Uxz(x,z) = Uxz(x,z) + 1;
                     Uyz(y,z) = Uyz(y,z) + 1;
-                elseif Dxz(x,z) < Dxy(x,y) && Dxz(x,z) < Dyz(y,z) % xz is closest pair
+                elseif Dxz(x,z) < Dxy(x,y) && Dxz(x,z) < Dyz(y,z)   % xz is closest pair
                     Uxy(x,y) = Uxy(x,y) + 1;
                     Uyz(y,z) = Uyz(y,z) + 1;
-                else                                      % yz is closest pair
+                else                                                % yz is closest pair
                     Uxy(x,y) = Uxy(x,y) + 1;
                     Uxz(x,z) = Uxz(x,z) + 1;
-                    
                 end
             end
         end
     end
-
-
-
 end
 
 
@@ -273,15 +216,32 @@ function [Cxz,Cyz,Czx] = update_coh2(Uxz,Uyz,Dxz,Dyz,Cxz,Cyz,Czx)
 end
 
 
-function [Cxy,Cxz,Cyz,Cyx,Czx,Czy] = update_coh3(Uxy,Uxz,Uyz,Dxy,Dxz,Dyz,Cxy,Cxz,Cyz,Cyx,Czx,Czy)
+function [Cxy,Cxz,Cyz,Cyx,Czx,Czy] = update_coh3(xb, yb, zb, Uxy, Uxz, Uyz, Dxy, Dxz, Dyz)
 % update Cohension matrix block when y ~= z && x ~= y
     [m,n] = size(Dxy);
     [~,p] = size(Dxz);
+    Cxy = zeros(m,n);
+    Cxz = zeros(m, p);
+    Cyz = zeros(n, p);
+    Cyx = zeros(n, m);
+    Czx = zeros(p, m);
+    Czy = zeros(p, n);
     
-     for x = 1:m
-        for y = 1:n
-            for z = 1:p
-                
+    xend = m;
+    ystart = 1;
+    zstart = 1;
+    if (xb == yb) && (yb == zb)
+        xend = m - 1;
+    end
+     for x = 1:xend
+        if xb == yb
+            ystart = x + 1;
+        end
+        for y = ystart:n
+            if yb == zb
+                zstart = y + 1;
+            end
+            for z = zstart:p
                 if Dxy(x,y) < Dxz(x,z) && Dxy(x,y) < Dyz(y,z)     % xy is closest pair
                     Cxy(x,y) = Cxy(x,y) + 1/Uxz(x,z);
                     Cyx(y,x) = Cyx(y,x) + 1/Uyz(y,z);
@@ -290,13 +250,10 @@ function [Cxy,Cxz,Cyz,Cyx,Czx,Czy] = update_coh3(Uxy,Uxz,Uyz,Dxy,Dxz,Dyz,Cxy,Cxz
                     Czx(z,x) = Czx(z,x) + 1/Uyz(y,z);
                 else                                      % yz is closest pair
                     Cyz(y,z) = Cyz(y,z) + 1/Uxy(x,y);
-                    Czy(z,y) = Czy(z,y) + 1/Uxz(x,z);
-                    
+                    Czy(z,y) = Czy(z,y) + 1/Uxz(x,z);           
                 end
             end
         end
-    end
-   
-
+     end
 end
 
