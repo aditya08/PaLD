@@ -1,4 +1,4 @@
-function [C,U] = pald_triplet_block2(D,b)
+function [C,U] = pald_triplet_block(D,b)
 
 if D' ~= D 
     error('distance matrix must be symmetric');

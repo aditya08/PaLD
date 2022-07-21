@@ -1,4 +1,4 @@
-function [C,U] = pald_triplet_block(D,b)
+function [C,U] = pald_triplet_block_old(D,b)
 
 
 if D' ~= D 
