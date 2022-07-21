@@ -611,20 +611,14 @@ void pald_triplet_naive(float *D, float beta, int n, float *C){
                 if (D[x + y * n] < D[x + z * n] && D[x + y * n] < D[y + z * n]) { // x and y are close
                     C[x + y * n] += 1.f/(conflict_matrix[x + z * n]);
                     C[y + x * n] += 1.f/(conflict_matrix[y + z * n]);
-                    // C[x + y * n] += 1.f/(conflict_matrix[x + z * n] + 2.f);
-                    // C[y + x * n] += 1.f/(conflict_matrix[y + z * n] + 2.f);
                 }
                 else if(D[x + z * n] < D[x + y * n] && D[x + z * n] < D[y + z *n]){ // x and z are close
                     C[x + z * n] += 1.f/(conflict_matrix[x + y * n]);
                     C[z + x * n] += 1.f/(conflict_matrix[y + z * n]);
-                    // C[x + z * n] += 1.f/(conflict_matrix[x + y * n] + 2.f);
-                    // C[z + x * n] += 1.f/(conflict_matrix[y + z * n] + 2.f);
                 }
                 else if (D[y + z * n] < D[x + y * n] && D[y + z * n] < D[x + z * n]){ // y and z are close
                     C[y + z * n] += 1.f/(conflict_matrix[x + y * n]);
                     C[z + y * n] += 1.f/(conflict_matrix[x + z * n]);
-                    // C[y + z * n] += 1.f/(conflict_matrix[x + y * n] + 2.f);
-                    // C[z + y * n] += 1.f/(conflict_matrix[x + z * n] + 2.f);
                 }
                 else {
                     if (D[x + y * n] == D[x + z * n]){
@@ -769,12 +763,41 @@ void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int b
         for (int j = i + 1; j < n; ++j){
             conflict_matrix[j + i * n] = 2.;
         }
-        // for (int j = i + 1; j < n; ++j){
-        //     conflict_matrix[i + j * n] = 2.;
-        // }
     }
     // print_matrix(n,conflict_matrix);
-    // Compute conflict focus size.
+
+    int xb, yb, zb, x, y, z;
+    int xend, ystart, zstart;
+
+    // compute conflict focus sizes.
+    for(xb = 0; xb < n; x+= block_size){
+        for(yb = xb; yb < n; yb += block_size){
+            for(zb = yb; zb < n; zb += block_size){
+                for(x = 0; x < xend; ++x){
+                    for(y = ystart; y < block_size; ++y){
+                        for(z = zstart; z < block_size; ++z){
+                            // update conflict matrix blocks.
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+    for(xb = 0; xb < n; x+= block_size){
+        for(yb = xb; yb < n; yb += block_size){
+            for(zb = yb; zb < n; zb += block_size){
+                for(x = 0; x < xend; ++x){
+                    for(y = ystart; y < block_size; ++y){
+                        for(z = zstart; z < block_size; ++z){
+                            // update cohesion matrix blocks.
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     for(int x = 0; x < n - 1; ++x){
         for(int y = x + 1; y < n; ++y){
