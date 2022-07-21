@@ -757,6 +757,10 @@ void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int b
     float* conflict_matrix = (float *)  _mm_malloc(n * n * sizeof(float), VECALIGN);
     memset(conflict_matrix, 0, n * n * sizeof(float));
 
+    float* distance_xy_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+    float* distance_xz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+    float* distance_yz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+    
     double conflict_loop_time, cohesion_loop_time;
     double time_start = omp_get_wtime();
     for (int i = 0; i < n; ++i){
@@ -772,7 +776,9 @@ void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int b
     // compute conflict focus sizes.
     for(xb = 0; xb < n; x+= block_size){
         for(yb = xb; yb < n; yb += block_size){
+            // copy DXY block from D.
             for(zb = yb; zb < n; zb += block_size){
+                //copy DXZ and DYZ blocks from D.
                 for(x = 0; x < xend; ++x){
                     for(y = ystart; y < block_size; ++y){
                         for(z = zstart; z < block_size; ++z){
