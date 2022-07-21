@@ -15,6 +15,7 @@ for x = 1:b:n
         Yb = y:min(y+b-1,n);
         for z = y:b:n
             Zb = z:min(z+b-1,n);
+            % c code can use pass-by-ref to avoid the branches below.
             [UXY,UXZ,UYZ] = ...
             update_cfs(x, y, z, D(Xb,Yb), D(Xb,Zb), D(Yb,Zb));
             if x == y && y == z
@@ -50,6 +51,7 @@ for x = 1:b:n
             Zb = z:min(z+b-1,n);
             [CXY,CXZ,CYZ,CYX,CZX,CZY] = ...
             update_coh(x, y, z, U(Xb,Yb),U(Xb,Zb),U(Yb,Zb),D(Xb,Yb),D(Xb,Zb),D(Yb,Zb));
+            % c code can use pass-by-ref to avoid the branches below.
             if x == y && y == z
                 C(Xb,Yb) = C(Xb,Yb) + CXY + CYX + CXZ + CZX + CYZ + CZY;
             elseif x == y
@@ -180,6 +182,6 @@ function [Cxy,Cxz,Cyz,Cyx,Czx,Czy] = update_coh(xb, yb, zb, Uxy, Uxz, Uyz, Dxy, 
                 end
             end
         end
-     end
+    end
 end
 
