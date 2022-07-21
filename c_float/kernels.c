@@ -28,6 +28,7 @@ C    out cohesion matrix: C(x,z) is z's support for x
 */
 void pald_allz_naive(float *D, float beta, int n, float *C) {
     // input checking
+    int nties = 0;
     if (beta < 0)
         fprintf(stderr, "beta must be positive\n");
 
@@ -56,6 +57,7 @@ void pald_allz_naive(float *D, float beta, int n, float *C) {
                         C[lin(y, z, n)] += 1.0f / cfs; // z closer to y than x
 
                     else {
+                        nties++;
                         // z equidistant to x and y
                         C[lin(x, z, n)] += 0.5f / cfs;
                         C[lin(y, z, n)] += 0.5f / cfs;
@@ -63,7 +65,7 @@ void pald_allz_naive(float *D, float beta, int n, float *C) {
                 }
             }
         }
-
+    printf("nties: %d\n", nties);
 }
 
 /*
@@ -572,9 +574,14 @@ void pald_triplet_naive(float *D, float beta, int n, float *C){
                     conflict_matrix[x + y * n] += 1;
                     conflict_matrix[y + z * n] += 1;
                 }
-                else{ // y and z are close
+                else if (D[y + z * n] < D[x + y * n] && D[y + z * n] < D[x + z * n]){ // y and z are close
                     conflict_matrix[x + y * n] += 1;
                     conflict_matrix[x + z * n] += 1;
+                }
+                else{ // we have pairwise/triplet ties.
+                    conflict_matrix[x + y * n] += 1;
+                    conflict_matrix[x + z * n] += 1;
+                    conflict_matrix[y + z * n] += 1;
                 }
             }
 
@@ -584,17 +591,18 @@ void pald_triplet_naive(float *D, float beta, int n, float *C){
     time_start = omp_get_wtime();
     // print_matrix(n,conflict_matrix);
     // initialize diagonal of C.
-    // float sum;
-    // for (int i = 0; i < n; ++i){
-    //     sum = 0.f;
-    //     for (int j = 0; j < i; ++j){
-    //         C[i + i * n] += 1.f / conflict_matrix[i + j * n];
-    //     }
+    float sum;
+    for (int i = 0; i < n; ++i){
+        sum = 0.f;
+        for (int j = 0; j < i; ++j){
+            sum += 1.f / conflict_matrix[j + i * n];
+        }
 
-    //     for (int j = i + 1; j < n; ++j){
-    //         C[i + i * n] += 1.f / conflict_matrix[i + j * n];
-    //     }
-    // }
+        for (int j = i + 1; j < n; ++j){
+            sum += 1.f / conflict_matrix[i + j * n];
+        }
+        C[i + i * n] = sum;
+    }
 
     // Compute cohesion matrix.
     for(int x = 0; x < n - 1; ++x){
@@ -612,11 +620,34 @@ void pald_triplet_naive(float *D, float beta, int n, float *C){
                     // C[x + z * n] += 1.f/(conflict_matrix[x + y * n] + 2.f);
                     // C[z + x * n] += 1.f/(conflict_matrix[y + z * n] + 2.f);
                 }
-                else{ // y and z are close
+                else if (D[y + z * n] < D[x + y * n] && D[y + z * n] < D[x + z * n]){ // y and z are close
                     C[y + z * n] += 1.f/(conflict_matrix[x + y * n]);
                     C[z + y * n] += 1.f/(conflict_matrix[x + z * n]);
                     // C[y + z * n] += 1.f/(conflict_matrix[x + y * n] + 2.f);
                     // C[z + y * n] += 1.f/(conflict_matrix[x + z * n] + 2.f);
+                }
+                else {
+                    if (D[x + y * n] == D[x + z * n]){
+                        C[x + y * n] += 1.f/conflict_matrix[x + z * n];
+                        C[y + x * n] += .5f/conflict_matrix[y + z * n];
+
+                        C[x + z * n] += 1.f/conflict_matrix[x + y * n];
+                        C[z + x * n] += .5f/conflict_matrix[y + z * n];
+                    }
+                    if (D[x + z * n] == D[y + z * n]){ //dist xz == dist yz
+                        C[x + z * n] += .5f/(conflict_matrix[x + y * n]);
+                        C[z + x * n] += 1.f/(conflict_matrix[y + z * n]);
+
+                        C[y + z * n] += .5f/conflict_matrix[x + y * n];
+                        C[z + y * n] += 1.f/conflict_matrix[x + z * n];
+                    }
+                    if (D[x + y * n] == D[y + z * n]){
+                        C[x + y * n] += .5f/conflict_matrix[x + z * n];
+                        C[y + x * n] += 1.f/conflict_matrix[y + z * n];
+
+                        C[y + z * n] += 1.f/conflict_matrix[x + y * n];
+                        C[z + y * n] += .5f/conflict_matrix[x + z * n];
+                    }
                 }
             }
         }
@@ -727,8 +758,142 @@ void pald_triplet_naive_openmp(float *D, float beta, int n, float *C, int nthrea
     printf("cohesion matrix update loop time: %.5fs\n\n", cohesion_loop_time);
 }
 
-void pald_triplet(float *D, float beta, int n, float *C, int block_size){
+void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int block_size){
     //TODO: Optimized sequential triplet code.
+    float* conflict_matrix = (float *)  _mm_malloc(n * n * sizeof(float), VECALIGN);
+    memset(conflict_matrix, 0, n * n * sizeof(float));
+
+    double conflict_loop_time, cohesion_loop_time;
+    double time_start = omp_get_wtime();
+    for (int i = 0; i < n; ++i){
+        for (int j = i + 1; j < n; ++j){
+            conflict_matrix[j + i * n] = 2.;
+        }
+        // for (int j = i + 1; j < n; ++j){
+        //     conflict_matrix[i + j * n] = 2.;
+        // }
+    }
+    // print_matrix(n,conflict_matrix);
+    // Compute conflict focus size.
+
+    for(int x = 0; x < n - 1; ++x){
+        for(int y = x + 1; y < n; ++y){
+            for(int z = y + 1; z < n; ++z){
+                if (D[y + x * n] < D[z + x * n] && D[y + x * n] < D[z + y * n]) { // x and y are close
+                    conflict_matrix[z + x * n] += 1;
+                    conflict_matrix[z + y * n] += 1;
+                }
+                else if(D[z + x * n] < D[y + x * n] && D[z + x * n] < D[z + y * n]){ // x and z are close
+                    conflict_matrix[y + x * n] += 1;
+                    conflict_matrix[z + y * n] += 1;
+                }
+                else if (D[z + y * n] < D[y + x * n] && D[z + y * n] < D[z + x * n]){ // y and z are close
+                    conflict_matrix[y + x * n] += 1;
+                    conflict_matrix[z + x * n] += 1;
+                }
+                else { // pairwise/triplet ties.
+                    conflict_matrix[y + x * n] += 1;
+                    conflict_matrix[z + x * n] += 1;
+                    conflict_matrix[z + y * n] += 1;
+                }
+            }
+
+        }
+    }
+    conflict_loop_time = omp_get_wtime() - time_start;
+    time_start = omp_get_wtime();
+    // print_matrix(n,conflict_matrix);
+    // initialize diagonal of C.
+    float sum;
+    for (int i = 0; i < n; ++i){
+        sum = 0.f;
+        for (int j = 0; j < i; ++j){
+            sum += 1.f / conflict_matrix[i + j * n];
+        }
+
+        for (int j = i + 1; j < n; ++j){
+            sum += 1.f / conflict_matrix[j + i * n];
+        }
+        C[i + i * n] = sum;
+    }
+
+    // for (int i = 0; i < n; ++i){
+    //     for (int j = i + 1; j < n; ++j){
+    //         conflict_matrix[i + j * n] = conflict_matrix[j + i * n];
+    //     }
+    // }
+
+    // for (int i = 0; i < n; ++i){
+    //     sum = 0.f;
+    //     for (int j = 0; j < i; ++j){
+    //         sum += 1.f / conflict_matrix[j + i * n];
+    //     }
+    //     for (int j = i + 1; j < n; ++j){
+    //         sum += 1.f / conflict_matrix[j + i * n];
+    //     }
+    //     C[i + i * n] = sum;
+    // }
+
+    // Compute cohesion matrix.
+    for(int x = 0; x < n - 1; ++x){
+        for(int y = x + 1; y < n; ++y){
+            for(int z = y + 1; z < n; ++z){
+                if (D[y + x * n] < D[z + x * n] && D[y + x * n] < D[z + y * n]) { // x and y are close
+                    C[x + y * n] += 1.f/(conflict_matrix[z + x * n]);
+                    C[y + x * n] += 1.f/(conflict_matrix[z + y * n]);
+                    // C[x + y * n] += 1.f/(conflict_matrix[x + z * n] + 2.f);
+                    // C[y + x * n] += 1.f/(conflict_matrix[y + z * n] + 2.f);
+                }
+                else if(D[z + x * n] < D[y + x * n] && D[z + x * n] < D[z + y * n]){ // x and z are close
+                    C[x + z * n] += 1.f/(conflict_matrix[y + x * n]);
+                    C[z + x * n] += 1.f/(conflict_matrix[z + y * n]);
+                    // C[x + z * n] += 1.f/(conflict_matrix[x + y * n] + 2.f);
+                    // C[z + x * n] += 1.f/(conflict_matrix[y + z * n] + 2.f);
+                }
+                else if (D[z + y * n] < D[y + x * n] && D[z + y * n] < D[z + x * n]){ // y and z are close
+                    C[y + z * n] += 1.f/(conflict_matrix[y + x * n]);
+                    C[z + y * n] += 1.f/(conflict_matrix[z + x * n]);
+                    // C[y + z * n] += 1.f/(conflict_matrix[x + y * n] + 2.f);
+                    // C[z + y * n] += 1.f/(conflict_matrix[x + z * n] + 2.f);
+                }
+                else{
+                    if (D[y + x * n] == D[z + x * n]){
+                        C[x + y * n] += 1.f/conflict_matrix[z + x * n];
+                        C[y + x * n] += .5f/conflict_matrix[z + y * n];
+
+                        C[x + z * n] += 1.f/conflict_matrix[y + x * n];
+                        C[z + x * n] += .5f/conflict_matrix[z + y * n];
+                    }
+                    if (D[z + x * n] == D[z + y * n]){ //dist xz == dist yz
+                        C[x + z * n] += .5f/(conflict_matrix[y + x * n]);
+                        C[z + x * n] += 1.f/(conflict_matrix[z + y * n]);
+
+                        C[y + z * n] += .5f/conflict_matrix[y + x * n];
+                        C[z + y * n] += 1.f/conflict_matrix[z + x * n];
+                    }
+                    if (D[y + x * n] == D[z + y * n]){
+                        C[x + y * n] += .5f/conflict_matrix[z + x * n];
+                        C[y + x * n] += 1.f/conflict_matrix[z + y * n];
+
+                        C[y + z * n] += 1.f/conflict_matrix[y + x * n];
+                        C[z + y * n] += .5f/conflict_matrix[z + x * n];
+                    }
+                }
+            }
+        }
+    }
+    cohesion_loop_time = omp_get_wtime() - time_start;
+    // print_matrix(n, C);
+
+    printf("======================================\n");
+    printf("Seq. Triplet Loop Times\n");
+    printf("======================================\n");
+
+    // printf("memops loop time: %.5fs\n", memops_loop_time);
+    printf("conflict focus size loop time: %.5fs\n", conflict_loop_time);
+    printf("cohesion matrix update loop time: %.5fs\n\n", cohesion_loop_time);
+
+    _mm_free(conflict_matrix);
 }
 
 void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, int num_threads){

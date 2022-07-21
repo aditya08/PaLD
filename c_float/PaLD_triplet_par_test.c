@@ -21,6 +21,20 @@ void print_out(int n, float *C) {
         }
         printf(";\n");
     }
+    printf("];\n");
+}
+
+void print_diag(int n, float *C){
+    printf("\n");
+    int i , j;
+    register int temp;
+    register float c;
+    printf("[\n");
+    for (i = 0; i < n; i++) {
+        temp = i * n + i;
+        c = C[temp]/(n - 1);
+        printf("%.8f ", c);
+    }
     printf("]\n");
 }
 
@@ -54,30 +68,37 @@ int main(int argc, char **argv) {
     //     }
     //     printf("%.2f ", D[i]);
     // }
-    // printf("]\n");
-    FILE *f = fopen("dist_mat.bin", "wb");
-    fwrite(D, sizeof(float), num_gen, f);
-    fclose(f);
-    int ntrials = 5;
+    // printf("];\n");
+    // FILE *f = fopen("dist_mat.bin", "wb");
+    // fwrite(D, sizeof(float), num_gen, f);
+    // fclose(f);
+    int ntrials = 1;
     //computing C with optimal block algorithm
     double start = 0., naive_time = 0., omp_time = 0.;
     for (int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet_naive(D, 1, n, C1);
+        //pald_triplet_naive(D, 1, n, C1);
+        pald_allz_naive(D, 1, n, C1);
         naive_time += omp_get_wtime() - start;
     }
 
+    //print_out(n, C1);
     for (int i = 0; i < ntrials; ++i){
         memset(C2, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet_naive_openmp(D, 1, n, C2, nthreads);
+        pald_triplet(D, 1, n, C2, 8);
+        //pald_triplet_naive(D, 1, n, C2);
+        //pald_triplet_naive_openmp(D, 1, n, C2, nthreads);
         omp_time += omp_get_wtime() - start;
     }
     
     
     //print out block algorithm result
-    // print_out(n, C1);
+    //print_out(n, C1);
+    // print_diag(n, C1);
+    // printf("\n\n");
+    //print_diag(n, C2);
 
 
     //computing C with original algorithm  
@@ -98,6 +119,7 @@ int main(int argc, char **argv) {
     float d, maxdiff = 0.;
     for (i = 0; i < num_gen; i++) {
         d = fabs(C1[i]-C2[i]);
+        //printf("(%.8f, %.8f), diff: %.8e\n", C1[i*n + i], C2[i * n + i], d);
         maxdiff = d > maxdiff ? d : maxdiff;
     }
     // printf("Maximum difference: %1.1e \n", maxdiff);
@@ -109,7 +131,7 @@ int main(int argc, char **argv) {
     printf("Avg. Parallel   time: %.5fs, nthreads: %d\n", omp_time, nthreads);
     printf("Speedup: %.2f\n",naive_time/omp_time);
     printf("Parallel Efficiency: %2.2f\n", naive_time/omp_time/nthreads*100);
-    printf("Maximum difference: %1.1e\n\n", maxdiff);
+    printf("Maximum difference: %1.8e\n\n", maxdiff);
 
     _mm_free(D);
     _mm_free(C2);
