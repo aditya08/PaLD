@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; ++i){
         memset(C2, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet(D, 1, n, C2, nthreads);
+        pald_triplet_blocked(D, 1, n, C2, nthreads);
         //pald_triplet_naive(D, 1, n, C2);
         //pald_triplet_naive_openmp(D, 1, n, C2, nthreads);
         omp_time += omp_get_wtime() - start;
