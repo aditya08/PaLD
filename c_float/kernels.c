@@ -766,13 +766,15 @@ void pald_triplet_blocked(float* restrict D, float beta, int n, float* restrict 
     float *conflict_xy_block, *conflict_xz_block, *conflict_yz_block;
     float *cohesion_xy_block, *cohesion_yx_block, *cohesion_xz_block, *cohesion_zx_block, *cohesion_yz_block, *cohesion_zy_block;
     char print_out = 0;
-    double conflict_loop_time, cohesion_loop_time;
-    double time_start = omp_get_wtime();
+    double time_start = 0.0;
+    double memops_loop_time = 0.0, conflict_loop_time = 0.0, cohesion_loop_time = 0.0;
+    time_start = omp_get_wtime();
     for (int i = 0; i < n; ++i){
         for (int j = i + 1; j < n; ++j){
             conflict_matrix[j + i * n] = 2.;
         }
     }
+    conflict_loop_time += omp_get_wtime() - time_start;
     if(print_out)
         print_matrix(n, n, conflict_matrix);
 
@@ -785,19 +787,17 @@ void pald_triplet_blocked(float* restrict D, float beta, int n, float* restrict 
     int iters = 0;
     for(xb = 0; xb < n; xb += block_size){
         for(yb = xb; yb < n; yb += block_size){
+            time_start = omp_get_wtime();
             for (i = 0; i < block_size; ++i){
                 //size_xy = (xb == yb) ? i : block_size;
                 memcpy(distance_xy_block + i * block_size, D + yb + (xb + i) * n, sizeof(float)*size_xy);
             }
+            memops_loop_time += omp_get_wtime() - time_start;
             // for(i = 0; i < block_size*block_size; ++i){
             //     printf("%.7f\n",distance_xy_block[i]);
             // }
             // copy DXY block from D.
             for(zb = yb; zb < n; zb += block_size){
-                // printf("(%d, %d, %d)\n", xb, yb, zb);
-                conflict_xy_block = conflict_matrix + yb + xb * n;
-                conflict_xz_block = conflict_matrix + zb + xb * n;
-                conflict_yz_block = conflict_matrix + zb + yb * n;
                 // if(xb == yb && yb == zb){
                 //     conflict_yz_block = conflict_xy_block;
                 //     conflict_xz_block = conflict_xy_block;
@@ -809,12 +809,14 @@ void pald_triplet_blocked(float* restrict D, float beta, int n, float* restrict 
                 //     conflict_xy_block = conflict_xz_block;
                 // }
                 //copy DXZ and DYZ blocks from D.c
+                time_start = omp_get_wtime();
                 for (i = 0; i < block_size; ++i){
                     // size_xz = (xb == zb) ? i : block_size;
                     // size_yz = (yb == zb) ? i : block_size;
                     memcpy(distance_xz_block + i * block_size, D + zb + (xb + i) * n, sizeof(float)*size_xz);
                     memcpy(distance_yz_block + i * block_size, D + zb + (yb + i) * n, sizeof(float)*size_yz);
                 }
+                memops_loop_time += omp_get_wtime() - time_start;
                 if(print_out){
                     print_matrix(block_size, block_size, distance_xy_block);
                     print_matrix(block_size, block_size, distance_xz_block);
@@ -825,6 +827,11 @@ void pald_triplet_blocked(float* restrict D, float beta, int n, float* restrict 
                     print_matrix(block_size, n, conflict_matrix + zb + yb * n);
                     print_matrix(n, n, conflict_matrix);
                 }
+                time_start = omp_get_wtime();
+                conflict_xy_block = conflict_matrix + yb + xb * n;
+                conflict_xz_block = conflict_matrix + zb + xb * n;
+                conflict_yz_block = conflict_matrix + zb + yb * n;
+                // printf("(%d, %d, %d)\n", xb, yb, zb);
                 xend = block_size;
                 ystart = 0;
                 zstart = 0;
@@ -882,13 +889,15 @@ void pald_triplet_blocked(float* restrict D, float beta, int n, float* restrict 
                 //     exit(-1);
                 // }
                 iters++;
+                conflict_loop_time += omp_get_wtime() - time_start;
             }
         }
     }
-    print_matrix(n, n, conflict_matrix);
-    printf("\n\n");
+    // print_matrix(n, n, conflict_matrix);
+    // printf("\n\n");
         // initialize diagonal of C.
     float sum;
+    time_start = omp_get_wtime();
     for (i = 0; i < n; ++i){
         sum = 0.f;
         for (j = 0; j < i; ++j){
@@ -900,14 +909,35 @@ void pald_triplet_blocked(float* restrict D, float beta, int n, float* restrict 
         }
         C[i + i * n] = sum;
     }
+    conflict_loop_time += omp_get_wtime() - time_start;
     iters = 0;
-    for(xb = 0; xb < n; x+= block_size){
+    for(xb = 0; xb < n; xb += block_size){
         for(yb = xb; yb < n; yb += block_size){
+            time_start = omp_get_wtime();
             for (i = 0; i < block_size; ++i){
                 //size_xy = (xb == yb) ? i : block_size;
                 memcpy(distance_xy_block + i * block_size, D + yb + (xb + i) * n, sizeof(float)*size_xy);
             }
+            memops_loop_time += omp_get_wtime() - time_start;
             for(zb = yb; zb < n; zb += block_size){
+                if(print_out){
+                    print_matrix(block_size, n, cohesion_xy_block);
+                    print_matrix(block_size, n, cohesion_yx_block);
+                    print_matrix(block_size, n, cohesion_xz_block);
+                    print_matrix(block_size, n, cohesion_zx_block);
+                    print_matrix(block_size, n, cohesion_yz_block);
+                    print_matrix(block_size, n, cohesion_zy_block);
+                    printf("(xb:%d, yb:%d, zb:%d)\n", xb, yb, zb);
+                }
+                time_start = omp_get_wtime();
+                for (i = 0; i < block_size; ++i){
+                    // size_xz = (xb == zb) ? i : block_size;
+                    // size_yz = (yb == zb) ? i : block_size;
+                    memcpy(distance_xz_block + i * block_size, D + zb + (xb + i) * n, sizeof(float)*size_xz);
+                    memcpy(distance_yz_block + i * block_size, D + zb + (yb + i) * n, sizeof(float)*size_yz);
+                }
+                memops_loop_time += omp_get_wtime() - time_start;
+                time_start = omp_get_wtime();
                 conflict_xy_block = conflict_matrix + yb + xb * n;
                 conflict_xz_block = conflict_matrix + zb + xb * n;
                 conflict_yz_block = conflict_matrix + zb + yb * n;
@@ -918,19 +948,6 @@ void pald_triplet_blocked(float* restrict D, float beta, int n, float* restrict 
                 cohesion_zx_block = C + xb + zb * n; 
                 cohesion_yz_block = C + zb + yb * n;
                 cohesion_zy_block = C + yb + zb * n;
-                print_matrix(block_size, n, cohesion_xy_block);
-                print_matrix(block_size, n, cohesion_yx_block);
-                print_matrix(block_size, n, cohesion_xz_block);
-                print_matrix(block_size, n, cohesion_zx_block);
-                print_matrix(block_size, n, cohesion_yz_block);
-                print_matrix(block_size, n, cohesion_zy_block);
-
-                for (i = 0; i < block_size; ++i){
-                    // size_xz = (xb == zb) ? i : block_size;
-                    // size_yz = (yb == zb) ? i : block_size;
-                    memcpy(distance_xz_block + i * block_size, D + zb + (xb + i) * n, sizeof(float)*size_xz);
-                    memcpy(distance_yz_block + i * block_size, D + zb + (yb + i) * n, sizeof(float)*size_yz);
-                }
                 xend = block_size;
                 ystart = 0;
                 zstart = 0;
@@ -954,14 +971,15 @@ void pald_triplet_blocked(float* restrict D, float beta, int n, float* restrict 
                         }
                         for(z = zstart; z < block_size; ++z){
                             // update cohesion matrix blocks.
-                            printf("(x:%d, y:%d, z:%d) : (%.2f, %.2f, %.2f)\n", x, y, z, distance_xy_block[y + x * block_size], distance_xz_block[z + x * block_size], distance_yz_block[z + y * block_size]);
+                            if(print_out)
+                                printf("(x:%d, y:%d, z:%d) : (%.2f, %.2f, %.2f)\n", x, y, z, distance_xy_block[y + x * block_size], distance_xz_block[z + x * block_size], distance_yz_block[z + y * block_size]);
                             if(distance_xy_block[y + x * block_size] < distance_xz_block[z + x * block_size] && distance_xy_block[y + x * block_size] < distance_yz_block[z + y * block_size]){
-                                xy_reduction += 1.f/conflict_xz_block[z];
-                                yx_reduction += 1.f/conflict_yz_block[z];
+                                yx_reduction += 1.f/conflict_xz_block[z];
+                                xy_reduction += 1.f/conflict_yz_block[z];
                             }
                             else if(distance_xz_block[z + x * block_size] < distance_xy_block[y + x * block_size] && distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size]){
-                                cohesion_xz_block[z] += 1.f/conflict_xy_block[y];
-                                cohesion_zx_block[x] += 1.f/conflict_yz_block[z];
+                                cohesion_zx_block[x] += 1.f/conflict_xy_block[y];
+                                cohesion_xz_block[z] += 1.f/conflict_yz_block[z];
                             }
                             else if(distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size] && distance_yz_block[z + y * block_size] < distance_xy_block[y + x * block_size]){
                                 cohesion_zy_block[y] += 1.f/conflict_xy_block[y];
@@ -969,26 +987,26 @@ void pald_triplet_blocked(float* restrict D, float beta, int n, float* restrict 
                             }
                             else{
                                 if (distance_xy_block[y + x * block_size] == distance_xz_block[z + x * block_size]){
-                                    xy_reduction += 1.f/conflict_xz_block[z];
-                                    yx_reduction += .5f/conflict_yz_block[z];
-                                    cohesion_zx_block[x] += .5f/conflict_yz_block[z];
-                                    cohesion_xz_block[z] += 1.f/conflict_xy_block[y];
+                                    yx_reduction += 1.f/conflict_xz_block[z];
+                                    xy_reduction += .5f/conflict_yz_block[z];
+                                    cohesion_xz_block[z] += .5f/conflict_yz_block[z];
+                                    cohesion_zx_block[x] += 1.f/conflict_xy_block[y];
                                 }
 
                                 if (distance_xz_block[z + x * block_size] == distance_yz_block[z + y * block_size]){
-                                    cohesion_xz_block[z] += .5f / conflict_xy_block[y];
-                                    cohesion_yz_block[z] += .5f / conflict_xy_block[y];
+                                    cohesion_zx_block[x] += .5f / conflict_xy_block[y];
+                                    cohesion_zy_block[y] += .5f / conflict_xy_block[y];
 
-                                    cohesion_zx_block[x] += 1.f / conflict_yz_block[z];
-                                    cohesion_zy_block[y] += 1.f / conflict_xz_block[z];
+                                    cohesion_xz_block[z] += 1.f / conflict_yz_block[z];
+                                    cohesion_yz_block[z] += 1.f / conflict_xz_block[z];
                                 }
 
                                 if (distance_xy_block[y + x * block_size] == distance_yz_block[z + y * block_size]){
-                                    xy_reduction += .5f/conflict_xz_block[z];
-                                    yx_reduction += 1.f/conflict_yz_block[z];
+                                    yx_reduction += .5f/conflict_xz_block[z];
+                                    xy_reduction += 1.f/conflict_yz_block[z];
 
-                                    cohesion_yz_block[z] += 1.f/conflict_xy_block[y];
-                                    cohesion_zy_block[y] += .5f/conflict_xz_block[z];
+                                    cohesion_zy_block[y] += 1.f/conflict_xy_block[y];
+                                    cohesion_yz_block[z] += .5f/conflict_xz_block[z];
                                 }
                             }
                             cohesion_zx_block += n;
@@ -1012,15 +1030,16 @@ void pald_triplet_blocked(float* restrict D, float beta, int n, float* restrict 
                     cohesion_yx_block = C + xb + yb * n;
                     cohesion_yz_block = C + zb + yb * n;
                 }
-                print_matrix(n, n, C);
-                if(iters == 5)
-                    exit(-1);   
+                if(print_out)
+                    print_matrix(n, n, C);
+                // if(iters == 15)
+                //     exit(-1);   
                 iters++;
+                cohesion_loop_time += omp_get_wtime() - time_start;
             }
         }
     }
-    print_matrix(n, n, C);
-    exit(-1);
+    // print_matrix(n, n, C);
 
     // for(int x = 0; x < n - 1; ++x){
     //     for(int y = x + 1; y < n; ++y){
@@ -1046,8 +1065,7 @@ void pald_triplet_blocked(float* restrict D, float beta, int n, float* restrict 
 
     //     }
     // }
-    conflict_loop_time = omp_get_wtime() - time_start;
-    time_start = omp_get_wtime();
+    
     // print_matrix(n,conflict_matrix);
 
     // for (int i = 0; i < n; ++i){
@@ -1066,63 +1084,301 @@ void pald_triplet_blocked(float* restrict D, float beta, int n, float* restrict 
     //     }
     //     C[i + i * n] = sum;
     // }
-
-    // Compute cohesion matrix.
-    for(int x = 0; x < n - 1; ++x){
-        for(int y = x + 1; y < n; ++y){
-            for(int z = y + 1; z < n; ++z){
-                if (D[y + x * n] < D[z + x * n] && D[y + x * n] < D[z + y * n]) { // x and y are close
-                    C[x + y * n] += 1.f/(conflict_matrix[z + x * n]);
-                    C[y + x * n] += 1.f/(conflict_matrix[z + y * n]);
-                    // C[x + y * n] += 1.f/(conflict_matrix[x + z * n] + 2.f);
-                    // C[y + x * n] += 1.f/(conflict_matrix[y + z * n] + 2.f);
-                }
-                else if(D[z + x * n] < D[y + x * n] && D[z + x * n] < D[z + y * n]){ // x and z are close
-                    C[x + z * n] += 1.f/(conflict_matrix[y + x * n]);
-                    C[z + x * n] += 1.f/(conflict_matrix[z + y * n]);
-                    // C[x + z * n] += 1.f/(conflict_matrix[x + y * n] + 2.f);
-                    // C[z + x * n] += 1.f/(conflict_matrix[y + z * n] + 2.f);
-                }
-                else if (D[z + y * n] < D[y + x * n] && D[z + y * n] < D[z + x * n]){ // y and z are close
-                    C[y + z * n] += 1.f/(conflict_matrix[y + x * n]);
-                    C[z + y * n] += 1.f/(conflict_matrix[z + x * n]);
-                    // C[y + z * n] += 1.f/(conflict_matrix[x + y * n] + 2.f);
-                    // C[z + y * n] += 1.f/(conflict_matrix[x + z * n] + 2.f);
-                }
-                else{
-                    if (D[y + x * n] == D[z + x * n]){
-                        C[x + y * n] += 1.f/conflict_matrix[z + x * n];
-                        C[y + x * n] += .5f/conflict_matrix[z + y * n];
-
-                        C[x + z * n] += 1.f/conflict_matrix[y + x * n];
-                        C[z + x * n] += .5f/conflict_matrix[z + y * n];
-                    }
-                    if (D[z + x * n] == D[z + y * n]){ //dist xz == dist yz
-                        C[x + z * n] += .5f/(conflict_matrix[y + x * n]);
-                        C[z + x * n] += 1.f/(conflict_matrix[z + y * n]);
-
-                        C[y + z * n] += .5f/conflict_matrix[y + x * n];
-                        C[z + y * n] += 1.f/conflict_matrix[z + x * n];
-                    }
-                    if (D[y + x * n] == D[z + y * n]){
-                        C[x + y * n] += .5f/conflict_matrix[z + x * n];
-                        C[y + x * n] += 1.f/conflict_matrix[z + y * n];
-
-                        C[y + z * n] += 1.f/conflict_matrix[y + x * n];
-                        C[z + y * n] += .5f/conflict_matrix[z + x * n];
-                    }
-                }
-            }
-        }
-    }
-    cohesion_loop_time = omp_get_wtime() - time_start;
     // print_matrix(n, C);
 
     printf("======================================\n");
-    printf("Seq. Triplet Loop Times\n");
+    printf("Seq. Triplet Blocked Loop Times\n");
     printf("======================================\n");
 
-    // printf("memops loop time: %.5fs\n", memops_loop_time);
+    printf("memops loop time: %.5fs\n", memops_loop_time);
+    printf("conflict focus size loop time: %.5fs\n", conflict_loop_time);
+    printf("cohesion matrix update loop time: %.5fs\n\n", cohesion_loop_time);
+
+    _mm_free(conflict_matrix);
+}
+
+void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int block_size){
+    //TODO: Optimized sequential triplet code.
+    float* conflict_matrix = (float *)  _mm_malloc(n * n * sizeof(float), VECALIGN);
+    memset(conflict_matrix, 0, n * n * sizeof(float));
+
+    float* distance_xy_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+    float* distance_xz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+    float* distance_yz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+    
+    float *conflict_xy_block, *conflict_xz_block, *conflict_yz_block;
+    float *cohesion_xy_block, *cohesion_yx_block, *cohesion_xz_block, *cohesion_zx_block, *cohesion_yz_block, *cohesion_zy_block;
+    // char print_out = 0;
+    double time_start = 0.0;
+    double memops_loop_time = 0.0, conflict_loop_time = 0.0, cohesion_loop_time = 0.0;
+    time_start = omp_get_wtime();
+    for (int i = 0; i < n; ++i){
+        for (int j = i + 1; j < n; ++j){
+            conflict_matrix[j + i * n] = 2.;
+        }
+    }
+    conflict_loop_time += omp_get_wtime() - time_start;
+    // if(print_out)
+    //     print_matrix(n, n, conflict_matrix);
+
+    int xb, yb, zb, x, y, z;
+    int i, j, k;
+    // int size_xy = block_size, size_xz = block_size, size_yz = block_size;
+    int xend, ystart, zstart;
+    float xy_reduction, yx_reduction;
+    // compute conflict focus sizes.
+    int iters = 0;
+    for(xb = 0; xb < n; xb += block_size){
+        for(yb = xb; yb < n; yb += block_size){
+            time_start = omp_get_wtime();
+            for (i = 0; i < block_size; ++i){
+                //size_xy = (xb == yb) ? i : block_size;
+                memcpy(distance_xy_block + i * block_size, D + yb + (xb + i) * n, sizeof(float)*block_size);
+            }
+            memops_loop_time += omp_get_wtime() - time_start;
+            // for(i = 0; i < block_size*block_size; ++i){
+            //     printf("%.7f\n",distance_xy_block[i]);
+            // }
+            // copy DXY block from D.
+            for(zb = yb; zb < n; zb += block_size){
+                //copy DXZ and DYZ blocks from D.c
+                time_start = omp_get_wtime();
+                for (i = 0; i < block_size; ++i){
+                    // size_xz = (xb == zb) ? i : block_size;
+                    // size_yz = (yb == zb) ? i : block_size;
+                    memcpy(distance_xz_block + i * block_size, D + zb + (xb + i) * n, sizeof(float)*block_size);
+                    memcpy(distance_yz_block + i * block_size, D + zb + (yb + i) * n, sizeof(float)*block_size);
+                }
+                memops_loop_time += omp_get_wtime() - time_start;
+                // if(print_out){
+                //     print_matrix(block_size, block_size, distance_xy_block);
+                //     print_matrix(block_size, block_size, distance_xz_block);
+                //     print_matrix(block_size, block_size, distance_yz_block);
+                //     printf("(xb:%d, yb:%d, zb:%d)\n", xb, yb, zb);
+                //     print_matrix(block_size, n, conflict_matrix + yb + xb * n);
+                //     print_matrix(block_size, n, conflict_matrix + zb + xb * n);
+                //     print_matrix(block_size, n, conflict_matrix + zb + yb * n);
+                //     print_matrix(n, n, conflict_matrix);
+                // }
+                time_start = omp_get_wtime();
+                conflict_xy_block = conflict_matrix + yb + xb * n;
+                conflict_xz_block = conflict_matrix + zb + xb * n;
+                conflict_yz_block = conflict_matrix + zb + yb * n;
+                // printf("(%d, %d, %d)\n", xb, yb, zb);
+                xend = block_size;
+                ystart = 0;
+                zstart = 0;
+                if(xb == yb && yb == zb){
+                    xend = block_size - 1;
+                }
+                for(x = 0; x < xend; ++x){
+                    if(xb == yb){
+                        ystart = x + 1;
+                        conflict_yz_block += ystart*n;
+                    }
+                    for(y = ystart; y < block_size; ++y){
+                        xy_reduction = 0.f;
+                        if(yb == zb){
+                            zstart = y + 1;
+                        }
+                        for(z = zstart; z < block_size; ++z){
+                            // update conflict matrix blocks.
+                            // if(print_out)
+                            //     printf("(x:%d, y:%d, z:%d) : (%.2f, %.2f, %.2f)\n", x, y, z, distance_xy_block[y + x * block_size], distance_xz_block[z + x * block_size], distance_yz_block[z + y * block_size]);
+                            if(distance_xy_block[y + x * block_size] < distance_xz_block[z + x * block_size] && distance_xy_block[y + x * block_size] < distance_yz_block[z + y * block_size]){
+                                ++conflict_xz_block[z];
+                                ++conflict_yz_block[z];
+                            }
+                            else if(distance_xz_block[z + x * block_size] < distance_xy_block[y + x * block_size] && distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size]){
+                                ++xy_reduction;
+                                ++conflict_yz_block[z];
+                            }
+                            else if(distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size] && distance_yz_block[z + y * block_size] < distance_xy_block[y + x * block_size]){
+                                ++xy_reduction;
+                                ++conflict_xz_block[z];
+                            }
+                            else{
+                                ++xy_reduction;
+                                ++conflict_xz_block[z];
+                                ++conflict_yz_block[z];
+                            }
+                        }
+                        // print_matrix(block_size, n, conflict_xy_block);
+                        conflict_xy_block[y] += xy_reduction;
+                        conflict_yz_block += n;
+                    }
+                    conflict_xz_block += n;
+                    conflict_xy_block += n;
+                    conflict_yz_block = conflict_matrix + zb + yb * n;
+                }
+                // if(print_out){
+                //     print_matrix(n, n, conflict_matrix);
+                //     // printf("\n\n");
+                //     printf("iters:%d\n", iters);
+                //     // if(iters == 2)
+                //     //     exit(-1);
+                // }
+                // if(iters == 7){
+                //     exit(-1);
+                // }
+                iters++;
+                conflict_loop_time += omp_get_wtime() - time_start;
+            }
+        }
+    }
+    // print_matrix(n, n, conflict_matrix);
+    // printf("\n\n");
+        // initialize diagonal of C.
+    float sum;
+    time_start = omp_get_wtime();
+    for (i = 0; i < n; ++i){
+        sum = 0.f;
+        for (j = 0; j < i; ++j){
+            sum += 1.f / conflict_matrix[i + j * n];
+        }
+
+        for (j = i + 1; j < n; ++j){
+            sum += 1.f / conflict_matrix[j + i * n];
+        }
+        C[i + i * n] = sum;
+    }
+    conflict_loop_time += omp_get_wtime() - time_start;
+    iters = 0;
+    for(xb = 0; xb < n; xb += block_size){
+        for(yb = xb; yb < n; yb += block_size){
+            time_start = omp_get_wtime();
+            for (i = 0; i < block_size; ++i){
+                //size_xy = (xb == yb) ? i : block_size;
+                memcpy(distance_xy_block + i * block_size, D + yb + (xb + i) * n, sizeof(float)*block_size);
+            }
+            memops_loop_time += omp_get_wtime() - time_start;
+            for(zb = yb; zb < n; zb += block_size){
+                // if(print_out){
+                //     print_matrix(block_size, n, cohesion_xy_block);
+                //     print_matrix(block_size, n, cohesion_yx_block);
+                //     print_matrix(block_size, n, cohesion_xz_block);
+                //     print_matrix(block_size, n, cohesion_zx_block);
+                //     print_matrix(block_size, n, cohesion_yz_block);
+                //     print_matrix(block_size, n, cohesion_zy_block);
+                //     printf("(xb:%d, yb:%d, zb:%d)\n", xb, yb, zb);
+                // }
+                time_start = omp_get_wtime();
+                for (i = 0; i < block_size; ++i){
+                    // size_xz = (xb == zb) ? i : block_size;
+                    // size_yz = (yb == zb) ? i : block_size;
+                    memcpy(distance_xz_block + i * block_size, D + zb + (xb + i) * n, sizeof(float)*block_size);
+                    memcpy(distance_yz_block + i * block_size, D + zb + (yb + i) * n, sizeof(float)*block_size);
+                }
+                memops_loop_time += omp_get_wtime() - time_start;
+                time_start = omp_get_wtime();
+                conflict_xy_block = conflict_matrix + yb + xb * n;
+                conflict_xz_block = conflict_matrix + zb + xb * n;
+                conflict_yz_block = conflict_matrix + zb + yb * n;
+
+                cohesion_xy_block = C + yb + xb * n; 
+                cohesion_yx_block = C + xb + yb * n;
+                cohesion_xz_block = C + zb + xb * n;
+                cohesion_zx_block = C + xb + zb * n; 
+                cohesion_yz_block = C + zb + yb * n;
+                cohesion_zy_block = C + yb + zb * n;
+                xend = block_size;
+                ystart = 0;
+                zstart = 0;
+                if(xb == yb && yb == zb){
+                    xend = block_size - 1;
+                }
+                for(x = 0; x < xend; ++x){
+                    if(xb == yb){
+                        ystart = x + 1;
+                        conflict_yz_block += ystart*n;
+                        cohesion_yz_block += ystart*n;
+                        cohesion_yx_block += ystart*n;
+                    }
+                    for(y = ystart; y < block_size; ++y){
+                        xy_reduction = 0.f;
+                        yx_reduction = 0.f;
+                        if(yb == zb){
+                            zstart = y + 1;
+                            cohesion_zx_block += zstart*n;
+                            cohesion_zy_block += zstart*n;
+                        }
+                        for(z = zstart; z < block_size; ++z){
+                            // update cohesion matrix blocks.
+                            // if(print_out)
+                            //     printf("(x:%d, y:%d, z:%d) : (%.2f, %.2f, %.2f)\n", x, y, z, distance_xy_block[y + x * block_size], distance_xz_block[z + x * block_size], distance_yz_block[z + y * block_size]);
+                            if(distance_xy_block[y + x * block_size] < distance_xz_block[z + x * block_size] && distance_xy_block[y + x * block_size] < distance_yz_block[z + y * block_size]){
+                                yx_reduction += 1.f/conflict_xz_block[z];
+                                xy_reduction += 1.f/conflict_yz_block[z];
+                            }
+                            else if(distance_xz_block[z + x * block_size] < distance_xy_block[y + x * block_size] && distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size]){
+                                cohesion_zx_block[x] += 1.f/conflict_xy_block[y];
+                                cohesion_xz_block[z] += 1.f/conflict_yz_block[z];
+                            }
+                            else if(distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size] && distance_yz_block[z + y * block_size] < distance_xy_block[y + x * block_size]){
+                                cohesion_zy_block[y] += 1.f/conflict_xy_block[y];
+                                cohesion_yz_block[z] += 1.f/conflict_xz_block[z];
+                            }
+                            else{
+                                if (distance_xy_block[y + x * block_size] == distance_xz_block[z + x * block_size]){
+                                    yx_reduction += 1.f/conflict_xz_block[z];
+                                    xy_reduction += .5f/conflict_yz_block[z];
+                                    cohesion_xz_block[z] += .5f/conflict_yz_block[z];
+                                    cohesion_zx_block[x] += 1.f/conflict_xy_block[y];
+                                }
+
+                                if (distance_xz_block[z + x * block_size] == distance_yz_block[z + y * block_size]){
+                                    cohesion_zx_block[x] += .5f / conflict_xy_block[y];
+                                    cohesion_zy_block[y] += .5f / conflict_xy_block[y];
+
+                                    cohesion_xz_block[z] += 1.f / conflict_yz_block[z];
+                                    cohesion_yz_block[z] += 1.f / conflict_xz_block[z];
+                                }
+
+                                if (distance_xy_block[y + x * block_size] == distance_yz_block[z + y * block_size]){
+                                    yx_reduction += .5f/conflict_xz_block[z];
+                                    xy_reduction += 1.f/conflict_yz_block[z];
+
+                                    cohesion_zy_block[y] += 1.f/conflict_xy_block[y];
+                                    cohesion_yz_block[z] += .5f/conflict_xz_block[z];
+                                }
+                            }
+                            cohesion_zx_block += n;
+                            cohesion_zy_block += n;
+                        }
+                        conflict_yz_block += n;
+
+                        cohesion_xy_block[y] += xy_reduction;
+                        cohesion_yx_block[x] += yx_reduction;
+                        cohesion_yx_block += n;
+                        cohesion_yz_block += n;
+                        cohesion_zx_block = C + xb + zb * n;
+                        cohesion_zy_block = C + yb + zb * n;
+                    }
+                    conflict_xz_block += n;
+                    conflict_xy_block += n;
+                    conflict_yz_block = conflict_matrix + zb + yb * n;
+
+                    cohesion_xz_block += n;
+                    cohesion_xy_block += n;
+                    cohesion_yx_block = C + xb + yb * n;
+                    cohesion_yz_block = C + zb + yb * n;
+                }
+                // if(print_out)
+                //     print_matrix(n, n, C);
+                // // if(iters == 15)
+                // //     exit(-1);   
+                iters++;
+                cohesion_loop_time += omp_get_wtime() - time_start;
+            }
+        }
+    }
+    // print_matrix(n, n, C);
+
+    printf("======================================\n");
+    printf("Seq. Triplet Blocked Loop Times\n");
+    printf("======================================\n");
+
+    printf("memops loop time: %.5fs\n", memops_loop_time);
     printf("conflict focus size loop time: %.5fs\n", conflict_loop_time);
     printf("cohesion matrix update loop time: %.5fs\n\n", cohesion_loop_time);
 

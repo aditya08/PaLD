@@ -58,16 +58,23 @@ int main(int argc, char **argv) {
     FILE *f = fopen("dist_mat.bin", "wb");
     fwrite(D, sizeof(float), num_gen, f);
     fclose(f);
-    int ntrials = 5;
+    int ntrials = 1;
     //computing C with optimal block algorithm
     double start = 0., naive_time = 0.;
     for (int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet_naive(D, 1, n, C1);
+        pald_triplet_blocked(D, 1, n, C1, cache_size);
         naive_time += omp_get_wtime() - start;
     }
     
+    double opt_time = 0.;
+    for (int i = 0; i < ntrials; ++i){
+        memset(C2, 0, sizeof(float)*n*n);
+        start = omp_get_wtime();
+        pald_triplet(D, 1, n, C2, cache_size);
+        opt_time += omp_get_wtime() - start;
+    }
     //print out block algorithm result
     // print_out(n, C1);
 
@@ -87,14 +94,19 @@ int main(int argc, char **argv) {
 
     // compute max norm error between two cohesion matrices
     
-    // float d, maxdiff = 0.;
-    // for (i = 0; i < num_gen; i++) {
-    //     d = fabs(C1[i]-C2[i]);
-    //     maxdiff = d > maxdiff ? d : maxdiff;
-    // }
-    // printf("Maximum difference: %1.1e \n", maxdiff);
+    float d, maxdiff = 0.;
+    for (i = 0; i < num_gen; i++) {
+        d = fabs(C1[i]-C2[i]);
+        maxdiff = d > maxdiff ? d : maxdiff;
+    }
+    printf("=============================================\n");
+    printf("           Summary, n: %d\n", n);
+    printf("=============================================\n");
+    printf("Triplet Naive Blocked time: %.5fs\n",naive_time/ntrials);
+    printf("Triplet Optimized time: %.5fs\n",opt_time/ntrials);
 
-    printf("%d  Naive time: %.3fs\n", n, naive_time/ntrials);
+    printf("Speedup: %.2f\n", naive_time/opt_time);
+    printf("Maximum difference: %1.8e\n\n", maxdiff);
    
     _mm_free(D);
     _mm_free(C2);
