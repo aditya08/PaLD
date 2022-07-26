@@ -1,16 +1,18 @@
 #include "kernels.h"
 
-void print_matrix(int n, float *C) {
-    printf("\n");
+void print_matrix(int size, int stride, float *C) {
+    printf("[\n");
     int i, j;
     register int temp;
-    for (i = 0; i < n; i++) {
-        for (j = 0; j < n; j++) {
-            temp = j * n + i;
+    for (i = 0; i < size; i++) {
+        for (j = 0; j < size; j++) {
+            temp = j * stride + i;
             printf("%.7f ", C[temp]);
         }
-        printf("\n");
+        printf(";\n");
     }
+    printf("];\n");
+
 }
 
 
@@ -761,6 +763,10 @@ void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int b
     float* distance_xz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
     float* distance_yz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
     
+    float* conflict_xy_block;
+    float* conflict_xz_block;
+    float* conflict_yz_block;
+    char print_out = 0;
     double conflict_loop_time, cohesion_loop_time;
     double time_start = omp_get_wtime();
     for (int i = 0; i < n; ++i){
@@ -768,29 +774,121 @@ void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int b
             conflict_matrix[j + i * n] = 2.;
         }
     }
-    // print_matrix(n,conflict_matrix);
+    if(print_out)
+        print_matrix(n, n, conflict_matrix);
 
     int xb, yb, zb, x, y, z;
+    int i, j, k;
+    int size_xy = block_size, size_xz = block_size, size_yz = block_size;
     int xend, ystart, zstart;
-
+    float conflict_xy_reduction;
     // compute conflict focus sizes.
-    for(xb = 0; xb < n; x+= block_size){
+    int iters = 0;
+    for(xb = 0; xb < n; xb += block_size){
         for(yb = xb; yb < n; yb += block_size){
+            for (i = 0; i < block_size; ++i){
+                //size_xy = (xb == yb) ? i : block_size;
+                memcpy(distance_xy_block + i * block_size, D + yb + (xb + i) * n, sizeof(float)*size_xy);
+            }
+            // for(i = 0; i < block_size*block_size; ++i){
+            //     printf("%.7f\n",distance_xy_block[i]);
+            // }
             // copy DXY block from D.
             for(zb = yb; zb < n; zb += block_size){
-                //copy DXZ and DYZ blocks from D.
+                // printf("(%d, %d, %d)\n", xb, yb, zb);
+                conflict_xy_block = conflict_matrix + yb + xb * n;
+                conflict_xz_block = conflict_matrix + zb + xb * n;
+                conflict_yz_block = conflict_matrix + zb + yb * n;
+                // if(xb == yb && yb == zb){
+                //     conflict_yz_block = conflict_xy_block;
+                //     conflict_xz_block = conflict_xy_block;
+                // }
+                // else if(xb == yb){
+                //     conflict_yz_block = conflict_xz_block;
+                // }
+                // else if(yb == zb){
+                //     conflict_xy_block = conflict_xz_block;
+                // }
+                //copy DXZ and DYZ blocks from D.c
+                for (i = 0; i < block_size; ++i){
+                    // size_xz = (xb == zb) ? i : block_size;
+                    // size_yz = (yb == zb) ? i : block_size;
+                    memcpy(distance_xz_block + i * block_size, D + zb + (xb + i) * n, sizeof(float)*size_xz);
+                    memcpy(distance_yz_block + i * block_size, D + zb + (yb + i) * n, sizeof(float)*size_yz);
+                }
+                if(print_out){
+                    print_matrix(block_size, block_size, distance_xy_block);
+                    print_matrix(block_size, block_size, distance_xz_block);
+                    print_matrix(block_size, block_size, distance_yz_block);
+                    printf("(xb:%d, yb:%d, zb:%d)\n", xb, yb, zb);
+                    print_matrix(block_size, n, conflict_matrix + yb + xb * n);
+                    print_matrix(block_size, n, conflict_matrix + zb + xb * n);
+                    print_matrix(block_size, n, conflict_matrix + zb + yb * n);
+                    print_matrix(n, n, conflict_matrix);
+                }
+                xend = block_size;
+                ystart = 0;
+                zstart = 0;
+                if(xb == yb && yb == zb){
+                    xend = block_size - 1;
+                }
                 for(x = 0; x < xend; ++x){
+                    if(xb == yb){
+                        ystart = x + 1;
+                        conflict_yz_block += ystart*n;
+                    }
                     for(y = ystart; y < block_size; ++y){
+                        conflict_xy_reduction = 0.f;
+                        if(yb == zb){
+                            zstart = y + 1;
+                        }
                         for(z = zstart; z < block_size; ++z){
                             // update conflict matrix blocks.
+                            if(print_out)
+                                printf("(x:%d, y:%d, z:%d) : (%.2f, %.2f, %.2f)\n", x, y, z, distance_xy_block[y + x * block_size], distance_xz_block[z + x * block_size], distance_yz_block[z + y * block_size]);
+                            if(distance_xy_block[y + x * block_size] < distance_xz_block[z + x * block_size] && distance_xy_block[y + x * block_size] < distance_yz_block[z + y * block_size]){
+                                ++conflict_xz_block[z];
+                                ++conflict_yz_block[z];
+                            }
+                            else if(distance_xz_block[z + x * block_size] < distance_xy_block[y + x * block_size] && distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size]){
+                                ++conflict_xy_reduction;
+                                ++conflict_yz_block[z];
+                            }
+                            else if(distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size] && distance_yz_block[z + y * block_size] < distance_xy_block[y + x * block_size]){
+                                ++conflict_xy_reduction;
+                                ++conflict_xz_block[z];
+                            }
+                            else{
+                                ++conflict_xy_reduction;
+                                ++conflict_xz_block[z];
+                                ++conflict_yz_block[z];
+                            }
                         }
+                        // print_matrix(block_size, n, conflict_xy_block);
+                        conflict_xy_block[y] += conflict_xy_reduction;
+                        conflict_yz_block += n;
                     }
+                    conflict_xz_block += n;
+                    conflict_xy_block += n;
+                    conflict_yz_block = conflict_matrix + zb + yb * n;
                 }
+                if(print_out){
+                    print_matrix(n, n, conflict_matrix);
+                    // printf("\n\n");
+                    printf("iters:%d\n", iters);
+                    // if(iters == 2)
+                    //     exit(-1);
+                }
+                // if(iters == 7){
+                //     exit(-1);
+                // }
+                iters++;
             }
         }
     }
-
-
+    print_matrix(n, n, conflict_matrix);
+    printf("\n\n");
+    exit(-1);
     for(xb = 0; xb < n; x+= block_size){
         for(yb = xb; yb < n; yb += block_size){
             for(zb = yb; zb < n; zb += block_size){

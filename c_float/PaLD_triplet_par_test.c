@@ -60,15 +60,15 @@ int main(int argc, char **argv) {
     dist_mat_gen2D(D, n, 1, 10*n, 12345, '2');
 
     //print out dist matrix
-    // printf("[\n");
-    // for (i = 0; i < num_gen; i++) {
+    printf("[\n");
+    for (i = 0; i < num_gen; i++) {
 
-    //     if (i % n == 0 && i > 0) {
-    //         printf(";\n");
-    //     }
-    //     printf("%.2f ", D[i]);
-    // }
-    // printf("];\n");
+        if (i % n == 0 && i > 0) {
+            printf(";\n");
+        }
+        printf("%.7f ", D[i]);
+    }
+    printf("];\n");
     // FILE *f = fopen("dist_mat.bin", "wb");
     // fwrite(D, sizeof(float), num_gen, f);
     // fclose(f);
@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; ++i){
         memset(C2, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet(D, 1, n, C2, 8);
+        pald_triplet(D, 1, n, C2, nthreads);
         //pald_triplet_naive(D, 1, n, C2);
         //pald_triplet_naive_openmp(D, 1, n, C2, nthreads);
         omp_time += omp_get_wtime() - start;
