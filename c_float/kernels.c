@@ -1117,6 +1117,12 @@ void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int b
     float* mask_xy_closest = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
     float* mask_xz_closest = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
     float* mask_yz_closest = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
+    float* mask_tie_xy_xz = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
+    float* mask_tie_xy_yz = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
+    float* mask_tie_xz_yz = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
+
+    float* buffer_zx_block = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
+    float* buffer_zy_block = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
 
     char distance_check_1 = 0;
     char distance_check_2 = 0;
@@ -1352,36 +1358,108 @@ void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int b
                             distance_check_1 = distance_xz_block[z + x * block_size] < distance_xy_block[y + x * block_size];
                             distance_check_2 =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
                             mask_xz_closest[z] = distance_check_1 & distance_check_2;
+                            // contains_tie_xz_yz += mask_tie_xz_yz[z];
 
                             distance_check_1 = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];distance_check_2 = distance_yz_block[z + y * block_size] < distance_xy_block[y + x * block_size];
                             mask_yz_closest[z] = distance_check_1 & distance_check_2;
+
+                            mask_tie_xy_xz[z] = (distance_xy_block[y + x * block_size] == distance_xz_block[z + x * block_size]) ? 1.f : 0.f;
+                            // contains_tie_xy_xz += mask_tie_xy_xz[z];
+                            mask_tie_xy_yz[z] = (distance_xy_block[y + x * block_size] == distance_yz_block[z + y * block_size]) ? 1.f : 0.f;
+                            // contains_tie_xy_yz += mask_tie_xy_yz[z];
+                            mask_tie_xz_yz[z] = (distance_xz_block[z + x * block_size] == distance_yz_block[z + y * block_size]) ? 1.0f : 0.f;
                         }
 
                         for(z = zstart; z < block_size; ++z){
                             //xy closest pair.
-                            contains_tie_xy_xz = (1 - mask_xy_closest[z])*(1 - mask_xz_closest[z]);
-                            contains_tie_xy_yz = (1 - mask_xy_closest[z])*(1 - mask_yz_closest[z]);
-                            contains_tie_xz_yz = (1 - mask_xz_closest[z])*(1 - mask_yz_closest[z]);
-                            alpha = contains_tie_xy_xz + .5f * contains_tie_xy_yz;
-                            gamma = .5f*contains_tie_xy_xz + contains_tie_xy_yz;
-                            yx_reduction += (mask_xy_closest[z] + alpha)*conflict_xz_block[z];
-                            xy_reduction += (mask_xy_closest[z] + gamma)*conflict_yz_block[z];
+                            alpha = (1 - mask_xy_closest[z])*(1 - mask_xz_closest[z])*(1 - mask_yz_closest[z]);
+                            yx_reduction += (mask_xy_closest[z] + alpha*mask_tie_xy_xz[z] + alpha*.5f*mask_tie_xy_yz[z])*conflict_xz_block[z];
+                            xy_reduction += (mask_xy_closest[z] + alpha*.5f*mask_tie_xy_xz[z] + alpha*mask_tie_xy_yz[z])*conflict_yz_block[z];
 
                             //xz closest pair.
-                            alpha = .5f*contains_tie_xy_xz + contains_tie_xz_yz;
-                            gamma = contains_tie_xy_xz + .5f*contains_tie_xz_yz;
-                            cohesion_xz_block[z] += (mask_xz_closest[z] + alpha)*conflict_yz_block[z];
-                            cohesion_zx_block[x] += (mask_xz_closest[z] + gamma)*conflict_xy_block[y];
+                            cohesion_xz_block[z] += (mask_xz_closest[z] + alpha*.5f*mask_tie_xy_xz[z] + alpha*mask_tie_xz_yz[z])*conflict_yz_block[z];
+                            cohesion_zx_block[x] += (mask_xz_closest[z] + alpha*mask_tie_xy_xz[z] + alpha*.5f*mask_tie_xz_yz[z])*conflict_xy_block[y];
 
                             //yz closest pair.
-                            alpha = .5f*contains_tie_xz_yz + contains_tie_xy_yz;
-                            gamma = contains_tie_xz_yz + .5f*contains_tie_xy_yz;
-                            cohesion_zy_block[y] += (mask_yz_closest[z] + alpha)*conflict_xy_block[y];
-                            cohesion_yz_block[z] += (mask_yz_closest[z] + gamma)*conflict_xz_block[z];
+                            cohesion_zy_block[y] += (mask_yz_closest[z] + alpha*.5f*mask_tie_xz_yz[z] + alpha*mask_tie_xy_yz[z])*conflict_xy_block[y];
+                            cohesion_yz_block[z] += (mask_yz_closest[z] + alpha*mask_tie_xz_yz[z] + alpha*.5f*mask_tie_xy_yz[z])*conflict_xz_block[z];
 
                             cohesion_zx_block += n;
                             cohesion_zy_block += n;
                         }
+
+                        // for(z = zstart; z < block_size; ++z){
+                        //     cohesion_zx_block[z*n + x] = buffer_zx_block[z];
+                        //     cohesion_zy_block[z*n + y] = buffer_zy_block
+                        // }
+                        // for(z = zstart; z < block_size; ++z){
+                        //     //xy closest pair.
+                        //     yx_reduction += mask_xy_closest[z] * conflict_xz_block[z];
+                        //     xy_reduction += mask_xy_closest[z] * conflict_yz_block[z];
+
+                        //     //xz closest pair.
+                        //     cohesion_xz_block[z] += mask_xz_closest[z]*conflict_yz_block[z];
+                        //     cohesion_zx_block[x] += mask_xz_closest[z]*conflict_xy_block[y];
+
+                        //     //yz closest pair.
+                        //     cohesion_zy_block[y] += mask_yz_closest[z]*conflict_xy_block[y];
+                        //     cohesion_yz_block[z] +=mask_yz_closest[z]*conflict_xz_block[z];
+
+                        //     cohesion_zx_block += n;
+                        //     cohesion_zy_block += n;
+                        // }
+
+                        // if(contains_tie_xy_xz > .5f){
+                        //     cohesion_zx_block = C + xb + zb * n;
+                        //     if(yb == zb){
+                        //         cohesion_zx_block += zstart*n;
+                        //     }
+                        //     for(z = zstart; z < block_size; ++z){
+                        //         contains_tie = (1 - mask_xy_closest[z])*(1 - mask_xz_closest[z])*(1 - mask_yz_closest[z])*mask_tie_xy_xz[z];
+                        //         yx_reduction +=  contains_tie*conflict_xz_block[z];
+                        //         xy_reduction += .5f*contains_tie*conflict_yz_block[z];
+                        //         cohesion_xz_block[z] += .5f*contains_tie*conflict_yz_block[z];
+                        //         cohesion_zx_block[x] += contains_tie*conflict_xy_block[y];
+                        //         cohesion_zx_block += n;
+                        //     }
+                        // }
+
+                        // if(contains_tie_xy_yz > .5f){
+                        //     cohesion_zy_block = C + yb + zb * n;
+                        //     if(yb == zb){
+                        //         cohesion_zy_block += zstart*n;
+                        //     }
+                        //     for(z = zstart; z < block_size; ++z){
+                        //         contains_tie = (1 - mask_xy_closest[z])*(1 - mask_xz_closest[z])*(1 - mask_yz_closest[z])*mask_tie_xy_yz[z];
+                        //         yx_reduction +=  .5f*contains_tie*conflict_xz_block[z];
+                        //         xy_reduction += contains_tie*conflict_yz_block[z];
+
+                        //         cohesion_zy_block[y] += contains_tie*conflict_xy_block[y];
+                        //         cohesion_yz_block[z] += .5f*contains_tie*conflict_xz_block[z];
+                                
+                        //         cohesion_zy_block += n;
+                        //     }
+                        // }
+
+                        // if(contains_tie_xz_yz > .5f){
+                        //     cohesion_zy_block = C + yb + zb * n;
+                        //     cohesion_zx_block = C + xb + zb * n;
+                        //     if(yb == zb){
+                        //         cohesion_zx_block += zstart*n;
+                        //         cohesion_zy_block += zstart*n;
+                        //     }
+                        //     for(z = zstart; z < block_size; ++z){
+                        //         contains_tie = (1 - mask_xy_closest[z])*(1 - mask_xz_closest[z])*(1 - mask_yz_closest[z])*mask_tie_xy_yz[z];
+                        //         cohesion_zx_block[x] += .5f*contains_tie*conflict_xy_block[y];
+                        //         cohesion_zy_block[y] += .5f*contains_tie*conflict_xy_block[y];
+
+                        //         cohesion_xz_block[z] += contains_tie*conflict_yz_block[z];
+                        //         cohesion_yz_block[z] +=contains_tie*conflict_xz_block[z];
+
+                        //         cohesion_zx_block += n;
+                        //         cohesion_zy_block += n;
+                        //     }
+                        // }
                         // for(z = zstart; z < block_size; ++z){
                         //     // update cohesion matrix blocks.
                         //     // if(print_out)
