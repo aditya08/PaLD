@@ -1,5 +1,5 @@
 CC = icc
-CFLAGS = -Ofast -Wall -ipo -qopenmp -mtune=cascadelake -xCORE-AVX512 -qopt-zmm-usage=high -DEBUG -DVECALIGN=64 -fno-alias -align -fbuiltin -finline -finline-functions -qopt-report-phase=vec -qopt-report=5  -qopt-report-file=vecreport.optrpt -g -unroll8 -fno-exceptions -simd -simd-function-pointers -qopt-multiple-gather-scatter-by-shuffles -qopt-streaming-stores=auto -qopt-subscript-in-range -vec-threshold=0
+CFLAGS = -Ofast -Wall -ipo -qopenmp -xCORE-AVX512 -qopt-zmm-usage=high -DEBUG -DVECALIGN=64 -fno-alias -align -fbuiltin -finline -finline-functions -qopt-report-phase=vec -qopt-report=5  -qopt-report-file=vecreport.optrpt -g -unroll8 -fno-exceptions -simd -simd-function-pointers -qopt-multiple-gather-scatter-by-shuffles -qopt-streaming-stores=auto -qopt-subscript-in-range -vec-threshold=0
 
 LDFLAGS = -qopenmp -DEBUG -g 
 

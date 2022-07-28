@@ -61,7 +61,8 @@ int main(int argc, char **argv) {
         // pald_allz_openmp(D, 1, n, C1, block_size,nthreads);
         memset(C1, 0, num_gen*sizeof(float));
         start = omp_get_wtime();
-        pald_allz(D, 1, n, C1, block_size);
+        pald_triplet(D, 1.f, n, C1, block_size);
+        //pald_allz(D, 1, n, C1, block_size);
         elapsed += omp_get_wtime() - start;
 
     }

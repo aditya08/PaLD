@@ -17,5 +17,6 @@ void pald_triplet_naive(float *D, float beta, int n, float *C);
 void pald_triplet_naive_openmp(float *D, float beta, int n, float *C, int num_threads);
 void pald_triplet_blocked(float *D, float beta, int n, float *C, int block_size);
 void pald_triplet(float *D, float beta, int n, float *C, int block_size);
+void pald_triplet_remainder_loop(float *D, float beta, int n, float *C, int block_size);
 void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, int num_threads);
 #endif //PALD_KERNELS_H
