@@ -1379,7 +1379,7 @@ void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int b
                             cohesion_xz_block[z] += (mask_xz_closest[z])*conflict_yz_block[z] + alpha*gamma*mask_tie_xy_xz[z]*conflict_yz_block[z] + alpha*mask_tie_xz_yz[z]*conflict_yz_block[z];
 
                             // cohesion_zx_block[x] += (mask_xz_closest[z] + alpha*mask_tie_xy_xz[z] + alpha*.5f*mask_tie_xz_yz[z])*conflict_xy_block[y];
-                            cohesion_zx_block[x] += (mask_xz_closest[z])*conflict_xy_block[y] + alpha*mask_tie_xy_xz[z]*conflict_xy_block[y] + alpha*gamma*mask_tie_xz_yz[z]*conflict_xy_block[y];
+                            cohesion_zx_block[x] += (mask_xz_closest[z] + alpha*mask_tie_xy_xz[z] + alpha*gamma*mask_tie_xz_yz[z])*conflict_xy_block[y];
                             // buffer_zx_block[z] += (mask_xz_closest[z])*conflict_xy_block[y] + alpha*mask_tie_xy_xz[z]*conflict_xy_block[y] + alpha*gamma*mask_tie_xz_yz[z]*conflict_xy_block[y];
                             //yz closest pair.
                             cohesion_zy_block[y] += (mask_yz_closest[z] + alpha*.5f*mask_tie_xz_yz[z] + alpha*mask_tie_xy_yz[z])*conflict_xy_block[y];
