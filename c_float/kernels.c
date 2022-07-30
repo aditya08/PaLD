@@ -1,4 +1,5 @@
 #include "kernels.h"
+#include "mkl.h"
 
 void print_matrix(int size, int stride, float *C) {
     printf("[\n");
@@ -1121,8 +1122,8 @@ void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int b
     float* mask_tie_xy_yz = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
     float* mask_tie_xz_yz = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
 
-    float* buffer_zx_block = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
-    float* buffer_zy_block = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
+    float* buffer_zx_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+    float* buffer_zy_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
 
     char distance_check_1 = 0;
     char distance_check_2 = 0;
@@ -1311,6 +1312,17 @@ void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int b
                 cohesion_zx_block = C + xb + zb * n; 
                 cohesion_yz_block = C + zb + yb * n;
                 cohesion_zy_block = C + yb + zb * n;
+
+                for(i = 0; i < block_size; ++i){
+                    for(j = 0; j < block_size; ++j){
+                        buffer_zx_block[j + i *block_size] = cohesion_zx_block[i + j*n];
+                    }
+                }
+                for(i = 0; i < block_size; ++i){
+                    for(j = 0; j < block_size; ++j){
+                        buffer_zy_block[j + i *block_size] = cohesion_zy_block[i + j*n];
+                    }
+                }
                 xend = block_size;
                 ystart = 0;
                 zstart = 0;
@@ -1437,6 +1449,16 @@ void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int b
                 // // if(iters == 15)
                 // //     exit(-1);   
                 iters++;
+                for(i = 0; i < block_size; ++i){
+                    for(j = 0; j < block_size; ++j){
+                        buffer_zx_block[j + i *block_size] = cohesion_zx_block[i + j*n];
+                    }
+                }
+                for(i = 0; i < block_size; ++i){
+                    for(j = 0; j < block_size; ++j){
+                        buffer_zy_block[j + i *block_size] = cohesion_zy_block[i + j*n];
+                    }
+                }
                 cohesion_loop_time += omp_get_wtime() - time_start;
             }
         }
@@ -1444,7 +1466,7 @@ void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int b
     // print_matrix(n, n, C);
 
     printf("======================================\n");
-    printf("Seq. Triplet Blocked Loop Times\n");
+    printf("Seq. Triplet Optimized Loop Times\n");
     printf("======================================\n");
 
     printf("memops loop time: %.5fs\n", memops_loop_time);
