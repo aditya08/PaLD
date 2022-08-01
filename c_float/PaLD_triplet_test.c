@@ -55,16 +55,16 @@ int main(int argc, char **argv) {
     //     printf("%.2f ", D[i]);
     // }
     // printf("]\n");
-    FILE *f = fopen("dist_mat.bin", "wb");
-    fwrite(D, sizeof(float), num_gen, f);
-    fclose(f);
+    // FILE *f = fopen("dist_mat.bin", "wb");
+    // fwrite(D, sizeof(float), num_gen, f);
+    // fclose(f);
     int ntrials = 5;
     //computing C with optimal block algorithm
     double start = 0., naive_time = 0.;
     for (int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_allz(D, 1, n, C1, cache_size);
+        pald_triplet(D, 1, n, C1, cache_size);
         naive_time += omp_get_wtime() - start;
     }
     // print_out(n,C1);
@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; ++i){
         memset(C2, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet(D, 1, n, C2, cache_size);
+        pald_allz(D, 1, n, C2, cache_size);
         opt_time += omp_get_wtime() - start;
     }
     // print_out(n,C2);
@@ -103,10 +103,10 @@ int main(int argc, char **argv) {
     printf("=============================================\n");
     printf("           Summary, n: %d\n", n);
     printf("=============================================\n");
-    printf("Triplet Naive Blocked time: %.5fs\n",naive_time/ntrials);
-    printf("Triplet Optimized time: %.5fs\n",opt_time/ntrials);
+    printf("Triplet Optimized Blocked time: %.5fs\n",naive_time/ntrials);
+    printf("Allz Optimized time: %.5fs\n",opt_time/ntrials);
 
-    printf("Speedup: %.2f\n", naive_time/opt_time);
+    printf("Speedup: %.2f\n", opt_time/naive_time);
     printf("Maximum difference: %1.8e\n\n", maxdiff);
    
     _mm_free(D);
