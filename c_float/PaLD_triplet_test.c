@@ -58,16 +58,16 @@ int main(int argc, char **argv) {
     FILE *f = fopen("dist_mat.bin", "wb");
     fwrite(D, sizeof(float), num_gen, f);
     fclose(f);
-    int ntrials = 1;
+    int ntrials = 5;
     //computing C with optimal block algorithm
     double start = 0., naive_time = 0.;
     for (int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet_blocked(D, 1, n, C1, cache_size);
+        pald_allz(D, 1, n, C1, cache_size);
         naive_time += omp_get_wtime() - start;
     }
-    
+    // print_out(n,C1);
     double opt_time = 0.;
     for (int i = 0; i < ntrials; ++i){
         memset(C2, 0, sizeof(float)*n*n);
@@ -75,6 +75,7 @@ int main(int argc, char **argv) {
         pald_triplet(D, 1, n, C2, cache_size);
         opt_time += omp_get_wtime() - start;
     }
+    // print_out(n,C2);
     //print out block algorithm result
     // print_out(n, C1);
 

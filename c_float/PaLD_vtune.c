@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
     FILE *f = fopen("dist_mat.bin", "wb");
     fwrite(D, sizeof(float), num_gen, f);
     fclose(f);
-    int ntrials = 5;
+    int ntrials = 1;
     double start = 0., elapsed = 0.;
     //computing C with optimal block algorithm
     //for (int i = 0; i < 4; ++i)
