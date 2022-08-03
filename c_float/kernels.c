@@ -1479,7 +1479,9 @@ void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int b
     _mm_free(distance_xy_block); _mm_free(distance_xz_block); _mm_free(distance_yz_block);
     _mm_free(mask_tie_xy_xz); _mm_free(mask_tie_xy_yz); _mm_free(mask_tie_xz_yz);
     _mm_free(mask_xy_closest); _mm_free(mask_xz_closest); _mm_free(mask_yz_closest);
-    _mm_free(buffer_zx_block); _mm_free(buffer_zy_block);
+    _mm_free(buffer_zx_block); _mm_free(buffer_zy_block); _mm_free(buffer_yx_block);
+    _mm_free(buffer_xz_block); _mm_free(buffer_yz_block); _mm_free(buffer_xy_block);
+    _mm_free(buffer_conflict_xz_block); _mm_free(buffer_conflict_yz_block);
     _mm_free(conflict_matrix);
 }
 
