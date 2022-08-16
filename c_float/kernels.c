@@ -1163,6 +1163,7 @@ void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int b
     float xy_reduction = 0.f, yx_reduction = 0.f, cohesion_sum = 0.f;
     // compute conflict focus sizes.
     int iters = 0;
+    //TODO: Add another level of blocking.
     for(xb = 0; xb < n; xb += block_size){
         for(yb = xb; yb < n; yb += block_size){
             time_start = omp_get_wtime();
