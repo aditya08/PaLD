@@ -27,14 +27,15 @@ void print_out(int n, float *C) {
 int main(int argc, char **argv) {
 
     //initializing testing environment spec
-    int n, cache_size, i;
+    int n, triplet_cache_size, allz_cache_size, i;
     
-    if ((argc != 2 && argc != 3) || !(n = atoi(argv[1]))) {
-        fprintf(stderr, "Usage: ./name distance_mat_size block_size\n");
+    if ((argc < 4) || !(n = atoi(argv[1])) || !(triplet_cache_size = atoi(argv[2])) || !(allz_cache_size = atoi(argv[3]))) {
+        fprintf(stderr, "Usage: ./name distance_mat_size triplet_block_size allz_block_size\n");
         exit(-1);
     }
 
-    cache_size = argc == 2 ? 2 : atoi(argv[2]);
+    // cache_size = argc > 2 ? 2 : atoi(argv[2]);
+    // cache_size = argc == 2 ? 2 : atoi(argv[2]);
 
     unsigned int num_gen = n * n;
 
@@ -64,7 +65,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet(D, 1, n, C1, cache_size);
+        pald_triplet(D, 1, n, C1, triplet_cache_size);
         naive_time += omp_get_wtime() - start;
     }
     // print_out(n,C1);
@@ -72,7 +73,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; ++i){
         memset(C2, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_allz(D, 1, n, C2, cache_size);
+        pald_allz(D, 1, n, C2, allz_cache_size);
         opt_time += omp_get_wtime() - start;
     }
     // print_out(n,C2);
