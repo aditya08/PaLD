@@ -81,4 +81,12 @@ void dist_mat_gen2D(float *D, int n, int min, int max, int seed, char dist) {
 }
 
 
-
+void sgemm_rand(float *A, int len, float min, float max, int seed){
+    srand(seed);
+    float fl = -2.f, cl = -2.f;
+    for(int i = 0; i < len; ++i){
+        A[i] = (float)rand() / RAND_MAX * (max - min) + min;
+        cl = (cl > A[i]) ? cl : A[i];
+        fl = (fl > A[i]) ? A[i]: fl;
+    }
+}
