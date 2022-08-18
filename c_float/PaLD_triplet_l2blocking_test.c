@@ -31,8 +31,8 @@ int main(int argc, char **argv) {
     //initializing testing environment spec
     int n, l2_cache_size, l1_cache_size, ntrials, i;
     
-    if ((argc < 5) || !(n = atoi(argv[1])) || !(l2_cache_size = atoi(argv[2])) || !(l1_cache_size = atoi(argv[3])) || !(ntrials = atoi(argv[4]))) {
-        fprintf(stderr, "Usage: ./name distance_mat_size l2_block_size l1_block_size ntrials\n");
+    if ((argc < 5) || !(n = atoi(argv[1])) || !(l1_cache_size = atoi(argv[2])) || !(l2_cache_size = atoi(argv[3])) || !(ntrials = atoi(argv[4]))) {
+        fprintf(stderr, "Usage: ./name distance_mat_size l1_block_size l2_block_size ntrials\n");
         exit(-1);
     }
 
@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet_L2_blocked(D, 1, n, C1, l1_cache_size, l2_cache_size);
+        pald_triplet(D, 1, n, C1, 256);
         naive_time += omp_get_wtime() - start;
     }
     // print_out(n,C1);
@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; ++i){
         memset(C2, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet(D, 1, n, C2, l1_cache_size);
+        pald_triplet_L2_blocked(D, 1, n, C2, l1_cache_size, l2_cache_size);
         opt_time += omp_get_wtime() - start;
     }
     // print_out(n,C2);
@@ -119,10 +119,10 @@ int main(int argc, char **argv) {
     printf("=============================================\n");
     printf("           Summary, n: %d\n", n);
     printf("=============================================\n");
-    printf("Triplet Optimized Blocked time: %.5fs\n",naive_time/ntrials);
-    printf("Allz Optimized time: %.5fs\n",opt_time/ntrials);
+    printf("Triplet Two-Level Blocked time: %.5fs\n",opt_time/ntrials);
+    printf("Triplet time: %.5fs\n",naive_time/ntrials);
 
-    printf("Speedup: %.2f\n", opt_time/naive_time);
+    printf("Speedup: %.2f\n", naive_time/opt_time);
     printf("Maximum difference: %1.8e\n\n", maxdiff);
    
     printf("SGEMM time: %.5fs\n", sgemm_time/ntrials);

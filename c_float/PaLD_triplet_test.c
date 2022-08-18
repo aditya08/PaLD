@@ -29,10 +29,10 @@ void print_out(int n, float *C) {
 int main(int argc, char **argv) {
 
     //initializing testing environment spec
-    int n, triplet_cache_size, allz_cache_size, i;
-    
-    if ((argc < 4) || !(n = atoi(argv[1])) || !(triplet_cache_size = atoi(argv[2])) || !(allz_cache_size = atoi(argv[3]))) {
-        fprintf(stderr, "Usage: ./name distance_mat_size triplet_block_size allz_block_size\n");
+    int n, triplet_L2_cache_size, triplet_L1_cache_size, allz_cache_size, i;
+    int ntrials;
+    if ((argc < 6) || !(n = atoi(argv[1])) || !(triplet_L1_cache_size = atoi(argv[2])) || !(triplet_L2_cache_size = atoi(argv[3])) || !(allz_cache_size = atoi(argv[4])) || !(ntrials = atoi(argv[5]))) {
+        fprintf(stderr, "Usage: ./name distance_mat_size triplet_L1_block_size triplet_L2_block_size allz_block_size ntrials\n");
         exit(-1);
     }
 
@@ -69,13 +69,12 @@ int main(int argc, char **argv) {
     // FILE *f = fopen("dist_mat.bin", "wb");
     // fwrite(D, sizeof(float), num_gen, f);
     // fclose(f);
-    int ntrials = 5;
     //computing C with optimal block algorithm
     double start = 0., naive_time = 0.;
     for (int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet(D, 1, n, C1, triplet_cache_size);
+        pald_triplet_L2_blocked(D, 1, n, C1, triplet_L1_cache_size,triplet_L2_cache_size);
         naive_time += omp_get_wtime() - start;
     }
     // print_out(n,C1);
