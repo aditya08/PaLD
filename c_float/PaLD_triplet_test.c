@@ -75,6 +75,7 @@ int main(int argc, char **argv) {
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
         pald_triplet_L2_blocked(D, 1, n, C1, triplet_L1_cache_size,triplet_L2_cache_size);
+        // pald_triplet(D, 1, n, C1, triplet_L1_cache_size);
         naive_time += omp_get_wtime() - start;
     }
     // print_out(n,C1);

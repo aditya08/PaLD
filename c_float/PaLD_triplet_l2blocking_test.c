@@ -40,7 +40,6 @@ int main(int argc, char **argv) {
     // cache_size = argc == 2 ? 2 : atoi(argv[2]);
 
     unsigned int num_gen = n * n;
-
     float *C1 = _mm_malloc(num_gen*sizeof(float), VECALIGN);
     float *C2 = _mm_malloc(num_gen*sizeof(float), VECALIGN);
     memset(C1, 0, sizeof(float)*num_gen);
@@ -55,7 +54,6 @@ int main(int argc, char **argv) {
     float *B = _mm_malloc(sizeof(float) * num_gen, VECALIGN);
     sgemm_rand(A, num_gen, -1.f, 1.f, 42);
     sgemm_rand(B, num_gen, -1.f, 1.f, 42);
-
     //print out dist matrix
     // printf("[\n");
     // for (i = 0; i < num_gen; i++) {
@@ -74,20 +72,21 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet(D, 1, n, C1, 256);
+        pald_triplet(D, 1, n, C1, l1_cache_size);
         naive_time += omp_get_wtime() - start;
     }
     // print_out(n,C1);
     double opt_time = 0.;
+    // printf("%d\n",num_gen);
     for (int i = 0; i < ntrials; ++i){
         memset(C2, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
         pald_triplet_L2_blocked(D, 1, n, C2, l1_cache_size, l2_cache_size);
         opt_time += omp_get_wtime() - start;
     }
-    // print_out(n,C2);
+    // print_out(n,C1);
     //print out block algorithm result
-    // print_out(n, C1);
+    // print_out(n, C2);
     double sgemm_time = 0.;
     for(int i = 0; i < ntrials; ++i){
         memset(C, 0, sizeof(float)*num_gen);
