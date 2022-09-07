@@ -56,16 +56,7 @@ int main(int argc, char **argv) {
     sgemm_rand(A, num_gen, -1.f, 1.f, 42);
     sgemm_rand(B, num_gen, -1.f, 1.f, 42);
 
-    //print out dist matrix
-    // printf("[\n");
-    // for (i = 0; i < num_gen; i++) {
-
-    //     if (i % n == 0 && i > 0) {
-    //         printf(";\n");
-    //     }
-    //     printf("%.2f ", D[i]);
-    // }
-    // printf("]\n");
+    
     // FILE *f = fopen("dist_mat.bin", "wb");
     // fwrite(D, sizeof(float), num_gen, f);
     // fclose(f);
@@ -74,8 +65,9 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet_L2_blocked(D, 1, n, C1, triplet_L1_cache_size,triplet_L2_cache_size);
+        // pald_triplet_L2_blocked(D, 1, n, C1, triplet_L1_cache_size,triplet_L2_cache_size);
         // pald_triplet(D, 1, n, C1, triplet_L1_cache_size);
+        pald_triplet_intrin(D, 1, n, C1, triplet_L1_cache_size);
         naive_time += omp_get_wtime() - start;
     }
     // print_out(n,C1);
@@ -92,6 +84,7 @@ int main(int argc, char **argv) {
     double sgemm_time = 0.;
     for(int i = 0; i < ntrials; ++i){
         memset(C, 0, sizeof(float)*num_gen);
+        omp_set_num_threads(1);
         start = omp_get_wtime();
         cblas_sgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, n, n, n, 1.f, A, n, B, n, 0.f, C, n);
         sgemm_time += omp_get_wtime() - start;
