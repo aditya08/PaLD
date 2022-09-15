@@ -114,13 +114,14 @@ int main(int argc, char **argv) {
     printf("=============================================\n");
     printf("           Summary, n: %d\n", n);
     printf("=============================================\n");
-    printf("Triplet Optimized Blocked time: %.5fs\n",naive_time/ntrials);
-    printf("Allz Optimized time: %.5fs\n",opt_time/ntrials);
+    printf("Triplet int-ops + baseline Blocked time: %.5fs\n",naive_time/ntrials);
+    printf("Triplet baseline time: %.5fs\n",opt_time/ntrials);
 
     printf("Speedup: %.2f\n", opt_time/naive_time);
     printf("Maximum difference: %1.8e\n\n", maxdiff);
    
     printf("SGEMM time: %.5fs\n", sgemm_time/ntrials);
+    printf("SGEMM Speedup: %.2f\n", naive_time/sgemm_time);
     _mm_free(D);
     _mm_free(C2);
     _mm_free(C1);
