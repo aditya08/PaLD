@@ -75,7 +75,8 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; ++i){
         memset(C2, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_allz(D, 1, n, C2, allz_cache_size);
+        // pald_allz(D, 1, n, C2, allz_cache_size);
+        pald_triplet(D, 1, n, C2, triplet_L1_cache_size);
         opt_time += omp_get_wtime() - start;
     }
     // print_out(n,C2);

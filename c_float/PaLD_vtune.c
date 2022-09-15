@@ -25,15 +25,17 @@ void print_out(int n, float *C) {
 int main(int argc, char **argv) {
 
     //initializing testing environment spec
-    int n, block_size, nthreads, i;
+    int n, l1_block_size, l2_block_size, nthreads, ntrials, i;
     
-    if ((argc != 3 && argc != 4) || !(n = atoi(argv[1]))) {
-        fprintf(stderr, "Usage: ./name distance_mat_size block_size num_threads\n");
+    if (argc != 6) {
+        fprintf(stderr, "Usage: ./name distance_mat_size L1_block_size L2_block_size num_threads ntrials\n");
         exit(-1);
     }
-
-    block_size = atoi(argv[2]);
-    nthreads = atoi(argv[3]);
+    n = atoi(argv[1]);
+    l1_block_size = atoi(argv[2]);
+    l2_block_size = atoi(argv[3]);
+    nthreads = atoi(argv[4]);
+    ntrials = atoi(argv[5]); 
     unsigned int num_gen = n * n;
 
     float *C1 = (float *) _mm_malloc(num_gen*sizeof(float),VECALIGN);//calloc(num_gen, sizeof(float));
@@ -53,7 +55,6 @@ int main(int argc, char **argv) {
     FILE *f = fopen("dist_mat.bin", "wb");
     fwrite(D, sizeof(float), num_gen, f);
     fclose(f);
-    int ntrials = 1;
     double start = 0., elapsed = 0.;
     //computing C with optimal block algorithm
     //for (int i = 0; i < 4; ++i)
@@ -61,7 +62,7 @@ int main(int argc, char **argv) {
         // pald_allz_openmp(D, 1, n, C1, block_size,nthreads);
         memset(C1, 0, num_gen*sizeof(float));
         start = omp_get_wtime();
-        pald_triplet(D, 1.f, n, C1, block_size);
+        pald_triplet_intrin(D, 1.f, n, C1, l1_block_size);
         //pald_allz(D, 1, n, C1, block_size);
         elapsed += omp_get_wtime() - start;
 
