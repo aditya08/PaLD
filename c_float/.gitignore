@@ -12,3 +12,4 @@ PaLD_vtune
 *.dpi
 *.dyn
 *.txt
+config/

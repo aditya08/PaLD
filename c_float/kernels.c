@@ -1067,72 +1067,56 @@ void pald_triplet_blocked(float* restrict D, float beta, int n, float* restrict 
 
 void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
     //TODO: Optimized sequential triplet code.
-    float* conflict_matrix = (float *)  _mm_malloc(n * n * sizeof(float), VECALIGN);
+    float* restrict conflict_matrix = (float *)  _mm_malloc(n * n * sizeof(float), VECALIGN);
     memset(conflict_matrix, 0, n * n * sizeof(float));
-    int* conflict_matrix_int = (int*)  _mm_malloc(n * n * sizeof(int), VECALIGN);
-    memset(conflict_matrix_int, 0, n * n * sizeof(int));
+    unsigned int* restrict conflict_matrix_int = (unsigned int*)  _mm_malloc(n * n * sizeof(unsigned int), VECALIGN);
+    memset(conflict_matrix_int, 0, n * n * sizeof(unsigned int));
 
     float* restrict distance_xy_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
     float* restrict distance_xz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
     float* restrict distance_yz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
 
-    float* restrict mask_xy_closest = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
-    float* restrict mask_xz_closest = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
-    float* restrict mask_yz_closest = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
+    // float* restrict mask_xy_closest = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
+    // float* restrict mask_xz_closest = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
+    // float* restrict mask_yz_closest = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
 
     unsigned int* restrict mask_xy_closest_int = (unsigned int*) _mm_malloc(block_size * sizeof(unsigned int), VECALIGN);
     unsigned int* restrict mask_xz_closest_int = (unsigned int*) _mm_malloc(block_size * sizeof(unsigned int), VECALIGN);
     unsigned int* restrict mask_yz_closest_int = (unsigned int*) _mm_malloc(block_size * sizeof(unsigned int), VECALIGN);
 
-
-    float* restrict mask_tie_xy_xz = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
-    float* restrict mask_tie_xy_yz = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
-    float* restrict mask_tie_xz_yz = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
-
-    float* restrict buffer_zx_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
-    float* restrict buffer_zy_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
-    float* restrict buffer_xz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
-    float* restrict buffer_yz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
-    float* restrict buffer_xy_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
-    float* restrict buffer_yx_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
-
-    float* restrict buffer_conflict_xz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
-    float* restrict buffer_conflict_yz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
-    float* restrict buffer_conflict_xy_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
-
-    int* restrict buffer_conflict_xz_block_int = (int *) _mm_malloc(block_size * block_size * sizeof(int), VECALIGN);
-    int* restrict buffer_conflict_yz_block_int = (int *) _mm_malloc(block_size * block_size * sizeof(int), VECALIGN);
-    int* restrict buffer_conflict_xy_block_int = (int *) _mm_malloc(block_size * block_size * sizeof(int), VECALIGN);
+    unsigned int* restrict buffer_conflict_xz_block_int = (unsigned int *) _mm_malloc(block_size * block_size * sizeof(unsigned int), VECALIGN);
+    unsigned int* restrict buffer_conflict_yz_block_int = (unsigned int *) _mm_malloc(block_size * block_size * sizeof(unsigned int), VECALIGN);
+    unsigned int* restrict buffer_conflict_xy_block_int = (unsigned int *) _mm_malloc(block_size * block_size * sizeof(unsigned int), VECALIGN);
 
     // float* restrict buffer_contains_tie = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
 
-    char distance_check_1 = 0;
-    char distance_check_2 = 0;
-    char distance_check_3 = 0;
+    // char distance_check_1 = 0;
+    // char distance_check_2 = 0;
+    // char distance_check_3 = 0;
     __mmask16 distance_check_1_mask, distance_check_2_mask;
     __mmask16 xy_closest_mmask, xz_closest_mmask, yz_closest_mmask;
     float contains_tie = 0.f;
-    int contains_tie_int;
-    int xy_reduction_int;
+    unsigned int contains_tie_int;
+    unsigned int xy_reduction_int;
     float alpha = 0.f;
     float dist_xy  = 0.f;
     float conflict_xy_val = 0.f;
-    float loop_len = 0.f;
+    unsigned int loop_len = 0;
 
-    float *conflict_xy_block, *conflict_xz_block, *conflict_yz_block;
-    int *conflict_xy_block_int, *conflict_xz_block_int, *conflict_yz_block_int;
-    float *cohesion_xy_block ;
-    float *cohesion_yx_block;
-    float *cohesion_xz_block;
-    float *cohesion_zx_block;
-    float *cohesion_yz_block;
-    float *cohesion_zy_block;
+    unsigned int *conflict_xy_block_int, *conflict_xz_block_int, *conflict_yz_block_int;
     // char print_out = 0;
     double time_start = 0.0, time_start2 = 0.0;
     double memops_loop_time = 0.0, conflict_loop_time = 0.0, cohesion_loop_time = 0.0;
+    int xb, yb, zb, x, y, z;
+    int i, j, k;
+    // int size_xy = block_size, size_xz = block_size, size_yz = block_size;
+    int xend, ystart, zstart;
+    float xy_reduction = 0.f, yx_reduction = 0.f, cohesion_sum = 0.f;
+    // compute conflict focus sizes.
+    int iters = 0;
     time_start = omp_get_wtime();
-    for (int i = 0; i < n; ++i){
-        for (int j = i + 1; j < n; ++j){
+    for (i = 0; i < n; ++i){
+        for (j = i + 1; j < n; ++j){
             // conflict_matrix[j + i * n] = 2.;
             conflict_matrix_int[j + i * n] = 2;
         }
@@ -1141,13 +1125,7 @@ void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
     // if(print_out)
     //     print_matrix(n, n, conflict_matrix);
 
-    int xb, yb, zb, x, y, z;
-    int i, j, k;
-    // int size_xy = block_size, size_xz = block_size, size_yz = block_size;
-    int xend, ystart, zstart;
-    float xy_reduction = 0.f, yx_reduction = 0.f, cohesion_sum = 0.f;
-    // compute conflict focus sizes.
-    int iters = 0;
+    
     //TODO: Add another level of blocking.
     for(xb = 0; xb < n; xb += block_size){
         for(yb = xb; yb < n; yb += block_size){
@@ -1192,132 +1170,263 @@ void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
                     //     // conflict_yz_block += ystart*n;
                     // }
                     ystart = (xb == yb) ? x + 1 : 0;
-                    for(y = ystart; y < block_size; ++y){
-                        // if(yb == zb){
-                        //     zstart = y + 1;
-                        // }
-                        xy_reduction = 0.f;
-                        xy_reduction_int = 0;
-                        zstart = (yb == zb) ? y + 1 : 0;
-                        dist_xy = distance_xy_block[y + x * block_size];
-                        contains_tie = 0.f;
-                        contains_tie_int = 0;
-                        loop_len = block_size - zstart;
-                        if(yb == zb){
-                            for (z = zstart; z < block_size; ++z){
-                                //compute masks for conflict blocks.
-                                // distance_check_1 = dist_xy < distance_xz_block[z + x * block_size];
-                                // distance_check_2 = dist_xy < distance_yz_block[z + y * block_size];
-                                // mask_xy_closest[z] = distance_check_1 & distance_check_2;
-
-                                // distance_check_1 = distance_xz_block[z + x * block_size] < dist_xy;
-                                // distance_check_2 =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
-                                // mask_xz_closest[z] = distance_check_1 & distance_check_2;
-
-                                // distance_check_1 = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];
-                                // distance_check_2 = distance_yz_block[z + y * block_size] < dist_xy;
-                                // mask_yz_closest[z] = distance_check_1 & distance_check_2;
-                                distance_check_1_mask = dist_xy < distance_xz_block[z + x * block_size];
-                                distance_check_2_mask = dist_xy < distance_yz_block[z + y * block_size];
-                                mask_xy_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
-
-                                distance_check_1_mask = distance_xz_block[z + x * block_size] < dist_xy;
-                                distance_check_2_mask =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
-                                mask_xz_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
-
-                                distance_check_1_mask = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];
-                                distance_check_2_mask = distance_yz_block[z + y * block_size] < dist_xy;
-                                mask_yz_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
-                            }
-                            for(z = zstart; z < block_size; ++z){
-                                //contains_tie = (1.f + (-mask_xy_closest[z]))*(1.f + (-mask_xz_closest[z]))*(1.f + (-mask_yz_closest[z]));
-                                // xy_reduction += mask_xz_closest[z] + mask_yz_closest[z];
-                                // buffer_conflict_yz_block[z + y * block_size] += mask_xy_closest[z] + mask_xz_closest[z];
-                                // buffer_conflict_xz_block[z + x * block_size] += mask_xy_closest[z] + mask_yz_closest[z];
-                                // contains_tie += mask_xy_closest[z] + mask_xz_closest[z] + mask_yz_closest[z];
-                                xy_reduction_int += mask_xz_closest_int[z] + mask_yz_closest_int[z];
-                                buffer_conflict_yz_block_int[z + y * block_size] += mask_xy_closest_int[z] + mask_xz_closest_int[z];
-                                buffer_conflict_xz_block_int[z + x * block_size] += mask_xy_closest_int[z] + mask_yz_closest_int[z];
-                                contains_tie_int += mask_xy_closest_int[z] + mask_xz_closest_int[z] + mask_yz_closest_int[z];
-                            }
-                            // if(contains_tie < loop_len){
-                            if(contains_tie_int < loop_len){
-                                for(z = zstart; z < block_size; ++z){
-                                    // contains_tie = (1.f + (-mask_xy_closest[z]))*(1.f + (-mask_xz_closest[z]))*(1.f + (-mask_yz_closest[z]));
-                                    // xy_reduction += contains_tie;
-                                    // buffer_conflict_yz_block[z + y * block_size] += contains_tie;
-                                    // buffer_conflict_xz_block[z + x * block_size] += contains_tie;
-                                    contains_tie_int = (1 - mask_xy_closest_int[z])*(1 - mask_xz_closest_int[z])*(1 - mask_yz_closest_int[z]);
-                                    xy_reduction_int += contains_tie_int;
-                                    buffer_conflict_yz_block_int[z + y * block_size] += contains_tie_int;
-                                    buffer_conflict_xz_block_int[z + x * block_size] += contains_tie_int;
-                                }
-                            }
-                            // print_matrix(block_size, n, conflict_xy_block);
-                            // buffer_conflict_xy_block[y + x * block_size] += xy_reduction;
-                            buffer_conflict_xy_block_int[y + x * block_size] += xy_reduction_int;
-                        }
-                        else{    
-                            for (z = 0; z < block_size; ++z){
-                                //compute masks for conflict blocks.
-                                // distance_check_1 = dist_xy < distance_xz_block[z + x * block_size];
-                                // distance_check_2 = dist_xy < distance_yz_block[z + y * block_size];
-                                // mask_xy_closest[z] = distance_check_1 & distance_check_2;
-
-                                // distance_check_1 = distance_xz_block[z + x * block_size] < dist_xy;
-                                // distance_check_2 =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
-                                // mask_xz_closest[z] = distance_check_1 & distance_check_2;
-
-                                // distance_check_1 = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];
-                                // distance_check_2 = distance_yz_block[z + y * block_size] < dist_xy;
-                                // mask_yz_closest[z] = distance_check_1 & distance_check_2;
-                                distance_check_1_mask = dist_xy < distance_xz_block[z + x * block_size];
-                                distance_check_2_mask = dist_xy < distance_yz_block[z + y * block_size];
-                                mask_xy_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
-
-                                distance_check_1_mask = distance_xz_block[z + x * block_size] < dist_xy;
-                                distance_check_2_mask =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
-                                mask_xz_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
-
-                                distance_check_1_mask = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];
-                                distance_check_2_mask = distance_yz_block[z + y * block_size] < dist_xy;
-                                mask_yz_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
-
-                                xy_reduction_int += mask_xz_closest_int[z] + mask_yz_closest_int[z];
-                                buffer_conflict_yz_block_int[z + y * block_size] += mask_xy_closest_int[z] + mask_xz_closest_int[z];
-                                buffer_conflict_xz_block_int[z + x * block_size] += mask_xy_closest_int[z] + mask_yz_closest_int[z];
-                                contains_tie_int += mask_xy_closest_int[z] + mask_xz_closest_int[z] + mask_yz_closest_int[z];
-
-                            }
-                            // for(z = 0; z < block_size; ++z){
-                            //     // xy_reduction += mask_xz_closest[z] + mask_yz_closest[z];
-                            //     // buffer_conflict_yz_block[z + y * block_size] += mask_xy_closest[z] + mask_xz_closest[z];
-                            //     // buffer_conflict_xz_block[z + x * block_size] += mask_xy_closest[z] + mask_yz_closest[z];
-                            //     // contains_tie += mask_xy_closest[z] + mask_xz_closest[z] + mask_yz_closest[z];
-                            //     xy_reduction_int += mask_xz_closest_int[z] + mask_yz_closest_int[z];
-                            //     buffer_conflict_yz_block_int[z + y * block_size] += mask_xy_closest_int[z] + mask_xz_closest_int[z];
-                            //     buffer_conflict_xz_block_int[z + x * block_size] += mask_xy_closest_int[z] + mask_yz_closest_int[z];
-                            //     contains_tie_int += mask_xy_closest_int[z] + mask_xz_closest_int[z] + mask_yz_closest_int[z];
-
+                    if(xb == yb){
+                        for(y = ystart; y < block_size; ++y){
+                            // if(yb == zb){
+                            //     zstart = y + 1;
                             // }
-                            // if(contains_tie < loop_len){
-                            if(contains_tie_int < loop_len){
-                                for(z = 0; z < block_size; ++z){
-                                    // contains_tie = (1.f + (-mask_xy_closest[z]))*(1.f + (-mask_xz_closest[z]))*(1.f + (-mask_yz_closest[z]));
-                                    // xy_reduction += contains_tie;
-                                    // buffer_conflict_yz_block[z + y * block_size] += contains_tie;
-                                    // buffer_conflict_xz_block[z + x * block_size] += contains_tie;
-                                    contains_tie_int = (1 - mask_xy_closest_int[z])*(1 - mask_xz_closest_int[z])*(1 - mask_yz_closest_int[z]);
-                                    xy_reduction_int += contains_tie_int;
-                                    buffer_conflict_yz_block_int[z + y * block_size] += contains_tie_int;
-                                    buffer_conflict_xz_block_int[z + x * block_size] += contains_tie_int;
+                            // xy_reduction = 0.f;
+                            xy_reduction_int = 0;
+                            zstart = (yb == zb) ? y + 1 : 0;
+                            dist_xy = distance_xy_block[y + x * block_size];
+                            // contains_tie = 0.f;
+                            contains_tie_int = 0;
+                            loop_len = block_size - zstart;
+                            if(yb == zb){
+                                for (z = zstart; z < block_size; ++z){
+                                    //compute masks for conflict blocks.
+                                    // distance_check_1 = dist_xy < distance_xz_block[z + x * block_size];
+                                    // distance_check_2 = dist_xy < distance_yz_block[z + y * block_size];
+                                    // mask_xy_closest[z] = distance_check_1 & distance_check_2;
+
+                                    // distance_check_1 = distance_xz_block[z + x * block_size] < dist_xy;
+                                    // distance_check_2 =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
+                                    // mask_xz_closest[z] = distance_check_1 & distance_check_2;
+
+                                    // distance_check_1 = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];
+                                    // distance_check_2 = distance_yz_block[z + y * block_size] < dist_xy;
+                                    // mask_yz_closest[z] = distance_check_1 & distance_check_2;
+                                    distance_check_1_mask = dist_xy < distance_xz_block[z + x * block_size];
+                                    distance_check_2_mask = dist_xy < distance_yz_block[z + y * block_size];
+                                    mask_xy_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
+
+                                    distance_check_1_mask = distance_xz_block[z + x * block_size] < dist_xy;
+                                    distance_check_2_mask =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
+                                    mask_xz_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
+
+                                    distance_check_1_mask = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];
+                                    distance_check_2_mask = distance_yz_block[z + y * block_size] < dist_xy;
+                                    mask_yz_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
                                 }
+                                for(z = zstart; z < block_size; ++z){
+                                    //contains_tie = (1.f + (-mask_xy_closest[z]))*(1.f + (-mask_xz_closest[z]))*(1.f + (-mask_yz_closest[z]));
+                                    // xy_reduction += mask_xz_closest[z] + mask_yz_closest[z];
+                                    // buffer_conflict_yz_block[z + y * block_size] += mask_xy_closest[z] + mask_xz_closest[z];
+                                    // buffer_conflict_xz_block[z + x * block_size] += mask_xy_closest[z] + mask_yz_closest[z];
+                                    // contains_tie += mask_xy_closest[z] + mask_xz_closest[z] + mask_yz_closest[z];
+                                    xy_reduction_int += mask_xz_closest_int[z] + mask_yz_closest_int[z];
+                                    buffer_conflict_yz_block_int[z + y * block_size] += mask_xy_closest_int[z] + mask_xz_closest_int[z];
+                                    buffer_conflict_xz_block_int[z + x * block_size] += mask_xy_closest_int[z] + mask_yz_closest_int[z];
+                                    contains_tie_int += mask_xy_closest_int[z] + mask_xz_closest_int[z] + mask_yz_closest_int[z];
+                                }
+                                // if(contains_tie < loop_len){
+                                if(contains_tie_int < loop_len){
+                                    for(z = zstart; z < block_size; ++z){
+                                        // contains_tie = (1.f + (-mask_xy_closest[z]))*(1.f + (-mask_xz_closest[z]))*(1.f + (-mask_yz_closest[z]));
+                                        // xy_reduction += contains_tie;
+                                        // buffer_conflict_yz_block[z + y * block_size] += contains_tie;
+                                        // buffer_conflict_xz_block[z + x * block_size] += contains_tie;
+                                        contains_tie_int = (1 - mask_xy_closest_int[z])*(1 - mask_xz_closest_int[z])*(1 - mask_yz_closest_int[z]);
+                                        xy_reduction_int += contains_tie_int;
+                                        buffer_conflict_yz_block_int[z + y * block_size] += contains_tie_int;
+                                        buffer_conflict_xz_block_int[z + x * block_size] += contains_tie_int;
+                                    }
+                                }
+                                // print_matrix(block_size, n, conflict_xy_block);
+                                // buffer_conflict_xy_block[y + x * block_size] += xy_reduction;
+                                buffer_conflict_xy_block_int[y + x * block_size] += xy_reduction_int;
                             }
-                            // print_matrix(block_size, n, conflict_xy_block);
-                            // buffer_conflict_xy_block[y + x * block_size] += xy_reduction;
-                            buffer_conflict_xy_block_int[y + x * block_size] += xy_reduction_int;
+                            else{    
+                                for (z = 0; z < block_size; ++z){
+                                    //compute masks for conflict blocks.
+                                    // distance_check_1 = dist_xy < distance_xz_block[z + x * block_size];
+                                    // distance_check_2 = dist_xy < distance_yz_block[z + y * block_size];
+                                    // mask_xy_closest[z] = distance_check_1 & distance_check_2;
+
+                                    // distance_check_1 = distance_xz_block[z + x * block_size] < dist_xy;
+                                    // distance_check_2 =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
+                                    // mask_xz_closest[z] = distance_check_1 & distance_check_2;
+
+                                    // distance_check_1 = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];
+                                    // distance_check_2 = distance_yz_block[z + y * block_size] < dist_xy;
+                                    // mask_yz_closest[z] = distance_check_1 & distance_check_2;
+                                    distance_check_1_mask = dist_xy < distance_xz_block[z + x * block_size];
+                                    distance_check_2_mask = dist_xy < distance_yz_block[z + y * block_size];
+                                    mask_xy_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
+
+                                    distance_check_1_mask = distance_xz_block[z + x * block_size] < dist_xy;
+                                    distance_check_2_mask =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
+                                    mask_xz_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
+
+                                    distance_check_1_mask = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];
+                                    distance_check_2_mask = distance_yz_block[z + y * block_size] < dist_xy;
+                                    mask_yz_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
+
+                                    xy_reduction_int += mask_xz_closest_int[z] + mask_yz_closest_int[z];
+                                    buffer_conflict_yz_block_int[z + y * block_size] += mask_xy_closest_int[z] + mask_xz_closest_int[z];
+                                    buffer_conflict_xz_block_int[z + x * block_size] += mask_xy_closest_int[z] + mask_yz_closest_int[z];
+                                    contains_tie_int += mask_xy_closest_int[z] + mask_xz_closest_int[z] + mask_yz_closest_int[z];
+
+                                }
+                                // for(z = 0; z < block_size; ++z){
+                                //     // xy_reduction += mask_xz_closest[z] + mask_yz_closest[z];
+                                //     // buffer_conflict_yz_block[z + y * block_size] += mask_xy_closest[z] + mask_xz_closest[z];
+                                //     // buffer_conflict_xz_block[z + x * block_size] += mask_xy_closest[z] + mask_yz_closest[z];
+                                //     // contains_tie += mask_xy_closest[z] + mask_xz_closest[z] + mask_yz_closest[z];
+                                //     xy_reduction_int += mask_xz_closest_int[z] + mask_yz_closest_int[z];
+                                //     buffer_conflict_yz_block_int[z + y * block_size] += mask_xy_closest_int[z] + mask_xz_closest_int[z];
+                                //     buffer_conflict_xz_block_int[z + x * block_size] += mask_xy_closest_int[z] + mask_yz_closest_int[z];
+                                //     contains_tie_int += mask_xy_closest_int[z] + mask_xz_closest_int[z] + mask_yz_closest_int[z];
+
+                                // }
+                                // if(contains_tie < loop_len){
+                                if(contains_tie_int < loop_len){
+                                    for(z = 0; z < block_size; ++z){
+                                        // contains_tie = (1.f + (-mask_xy_closest[z]))*(1.f + (-mask_xz_closest[z]))*(1.f + (-mask_yz_closest[z]));
+                                        // xy_reduction += contains_tie;
+                                        // buffer_conflict_yz_block[z + y * block_size] += contains_tie;
+                                        // buffer_conflict_xz_block[z + x * block_size] += contains_tie;
+                                        contains_tie_int = (1 - mask_xy_closest_int[z])*(1 - mask_xz_closest_int[z])*(1 - mask_yz_closest_int[z]);
+                                        xy_reduction_int += contains_tie_int;
+                                        buffer_conflict_yz_block_int[z + y * block_size] += contains_tie_int;
+                                        buffer_conflict_xz_block_int[z + x * block_size] += contains_tie_int;
+                                    }
+                                }
+                                // print_matrix(block_size, n, conflict_xy_block);
+                                // buffer_conflict_xy_block[y + x * block_size] += xy_reduction;
+                                buffer_conflict_xy_block_int[y + x * block_size] += xy_reduction_int;
+                            }
+                            // conflict_yz_block += n;
                         }
-                        // conflict_yz_block += n;
+                    }
+                    else{
+                        for(y = 0; y < block_size; ++y){
+                            // if(yb == zb){
+                            //     zstart = y + 1;
+                            // }
+                            // xy_reduction = 0.f;
+                            xy_reduction_int = 0;
+                            zstart = (yb == zb) ? y + 1 : 0;
+                            dist_xy = distance_xy_block[y + x * block_size];
+                            // contains_tie = 0.f;
+                            contains_tie_int = 0;
+                            loop_len = block_size - zstart;
+                            if(yb == zb){
+                                for (z = zstart; z < block_size; ++z){
+                                    //compute masks for conflict blocks.
+                                    // distance_check_1 = dist_xy < distance_xz_block[z + x * block_size];
+                                    // distance_check_2 = dist_xy < distance_yz_block[z + y * block_size];
+                                    // mask_xy_closest[z] = distance_check_1 & distance_check_2;
+
+                                    // distance_check_1 = distance_xz_block[z + x * block_size] < dist_xy;
+                                    // distance_check_2 =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
+                                    // mask_xz_closest[z] = distance_check_1 & distance_check_2;
+
+                                    // distance_check_1 = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];
+                                    // distance_check_2 = distance_yz_block[z + y * block_size] < dist_xy;
+                                    // mask_yz_closest[z] = distance_check_1 & distance_check_2;
+                                    distance_check_1_mask = dist_xy < distance_xz_block[z + x * block_size];
+                                    distance_check_2_mask = dist_xy < distance_yz_block[z + y * block_size];
+                                    mask_xy_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
+
+                                    distance_check_1_mask = distance_xz_block[z + x * block_size] < dist_xy;
+                                    distance_check_2_mask =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
+                                    mask_xz_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
+
+                                    distance_check_1_mask = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];
+                                    distance_check_2_mask = distance_yz_block[z + y * block_size] < dist_xy;
+                                    mask_yz_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
+                                }
+                                for(z = zstart; z < block_size; ++z){
+                                    //contains_tie = (1.f + (-mask_xy_closest[z]))*(1.f + (-mask_xz_closest[z]))*(1.f + (-mask_yz_closest[z]));
+                                    // xy_reduction += mask_xz_closest[z] + mask_yz_closest[z];
+                                    // buffer_conflict_yz_block[z + y * block_size] += mask_xy_closest[z] + mask_xz_closest[z];
+                                    // buffer_conflict_xz_block[z + x * block_size] += mask_xy_closest[z] + mask_yz_closest[z];
+                                    // contains_tie += mask_xy_closest[z] + mask_xz_closest[z] + mask_yz_closest[z];
+                                    xy_reduction_int += mask_xz_closest_int[z] + mask_yz_closest_int[z];
+                                    buffer_conflict_yz_block_int[z + y * block_size] += mask_xy_closest_int[z] + mask_xz_closest_int[z];
+                                    buffer_conflict_xz_block_int[z + x * block_size] += mask_xy_closest_int[z] + mask_yz_closest_int[z];
+                                    contains_tie_int += mask_xy_closest_int[z] + mask_xz_closest_int[z] + mask_yz_closest_int[z];
+                                }
+                                // if(contains_tie < loop_len){
+                                if(contains_tie_int < loop_len){
+                                    for(z = zstart; z < block_size; ++z){
+                                        // contains_tie = (1.f + (-mask_xy_closest[z]))*(1.f + (-mask_xz_closest[z]))*(1.f + (-mask_yz_closest[z]));
+                                        // xy_reduction += contains_tie;
+                                        // buffer_conflict_yz_block[z + y * block_size] += contains_tie;
+                                        // buffer_conflict_xz_block[z + x * block_size] += contains_tie;
+                                        contains_tie_int = (1 - mask_xy_closest_int[z])*(1 - mask_xz_closest_int[z])*(1 - mask_yz_closest_int[z]);
+                                        xy_reduction_int += contains_tie_int;
+                                        buffer_conflict_yz_block_int[z + y * block_size] += contains_tie_int;
+                                        buffer_conflict_xz_block_int[z + x * block_size] += contains_tie_int;
+                                    }
+                                }
+                                // print_matrix(block_size, n, conflict_xy_block);
+                                // buffer_conflict_xy_block[y + x * block_size] += xy_reduction;
+                                buffer_conflict_xy_block_int[y + x * block_size] += xy_reduction_int;
+                            }
+                            else{    
+                                for (z = 0; z < block_size; ++z){
+                                    //compute masks for conflict blocks.
+                                    // distance_check_1 = dist_xy < distance_xz_block[z + x * block_size];
+                                    // distance_check_2 = dist_xy < distance_yz_block[z + y * block_size];
+                                    // mask_xy_closest[z] = distance_check_1 & distance_check_2;
+
+                                    // distance_check_1 = distance_xz_block[z + x * block_size] < dist_xy;
+                                    // distance_check_2 =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
+                                    // mask_xz_closest[z] = distance_check_1 & distance_check_2;
+
+                                    // distance_check_1 = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];
+                                    // distance_check_2 = distance_yz_block[z + y * block_size] < dist_xy;
+                                    // mask_yz_closest[z] = distance_check_1 & distance_check_2;
+                                    distance_check_1_mask = dist_xy < distance_xz_block[z + x * block_size];
+                                    distance_check_2_mask = dist_xy < distance_yz_block[z + y * block_size];
+                                    mask_xy_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
+
+                                    distance_check_1_mask = distance_xz_block[z + x * block_size] < dist_xy;
+                                    distance_check_2_mask =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
+                                    mask_xz_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
+
+                                    distance_check_1_mask = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];
+                                    distance_check_2_mask = distance_yz_block[z + y * block_size] < dist_xy;
+                                    mask_yz_closest_int[z] = distance_check_1_mask & distance_check_2_mask;
+
+                                    xy_reduction_int += mask_xz_closest_int[z] + mask_yz_closest_int[z];
+                                    buffer_conflict_yz_block_int[z + y * block_size] += mask_xy_closest_int[z] + mask_xz_closest_int[z];
+                                    buffer_conflict_xz_block_int[z + x * block_size] += mask_xy_closest_int[z] + mask_yz_closest_int[z];
+                                    contains_tie_int += mask_xy_closest_int[z] + mask_xz_closest_int[z] + mask_yz_closest_int[z];
+
+                                }
+                                // for(z = 0; z < block_size; ++z){
+                                //     // xy_reduction += mask_xz_closest[z] + mask_yz_closest[z];
+                                //     // buffer_conflict_yz_block[z + y * block_size] += mask_xy_closest[z] + mask_xz_closest[z];
+                                //     // buffer_conflict_xz_block[z + x * block_size] += mask_xy_closest[z] + mask_yz_closest[z];
+                                //     // contains_tie += mask_xy_closest[z] + mask_xz_closest[z] + mask_yz_closest[z];
+                                //     xy_reduction_int += mask_xz_closest_int[z] + mask_yz_closest_int[z];
+                                //     buffer_conflict_yz_block_int[z + y * block_size] += mask_xy_closest_int[z] + mask_xz_closest_int[z];
+                                //     buffer_conflict_xz_block_int[z + x * block_size] += mask_xy_closest_int[z] + mask_yz_closest_int[z];
+                                //     contains_tie_int += mask_xy_closest_int[z] + mask_xz_closest_int[z] + mask_yz_closest_int[z];
+
+                                // }
+                                // if(contains_tie < loop_len){
+                                if(contains_tie_int < loop_len){
+                                    for(z = 0; z < block_size; ++z){
+                                        // contains_tie = (1.f + (-mask_xy_closest[z]))*(1.f + (-mask_xz_closest[z]))*(1.f + (-mask_yz_closest[z]));
+                                        // xy_reduction += contains_tie;
+                                        // buffer_conflict_yz_block[z + y * block_size] += contains_tie;
+                                        // buffer_conflict_xz_block[z + x * block_size] += contains_tie;
+                                        contains_tie_int = (1 - mask_xy_closest_int[z])*(1 - mask_xz_closest_int[z])*(1 - mask_yz_closest_int[z]);
+                                        xy_reduction_int += contains_tie_int;
+                                        buffer_conflict_yz_block_int[z + y * block_size] += contains_tie_int;
+                                        buffer_conflict_xz_block_int[z + x * block_size] += contains_tie_int;
+                                    }
+                                }
+                                // print_matrix(block_size, n, conflict_xy_block);
+                                // buffer_conflict_xy_block[y + x * block_size] += xy_reduction;
+                                buffer_conflict_xy_block_int[y + x * block_size] += xy_reduction_int;
+                            }
+                            // conflict_yz_block += n;
+                        }
                     }
 
                 }
@@ -1380,7 +1489,38 @@ void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
     }
     cohesion_loop_time += omp_get_wtime() - time_start;
     iters = 0;
+    _mm_free(distance_xy_block); _mm_free(distance_xz_block); _mm_free(distance_yz_block);
+    float *conflict_xy_block, *conflict_xz_block, *conflict_yz_block;
+    float *cohesion_xy_block ;
+    float *cohesion_yx_block;
+    float *cohesion_xz_block;
+    float *cohesion_zx_block;
+    float *cohesion_yz_block;
+    float *cohesion_zy_block;
     block_size/=2;
+    distance_xy_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+    distance_xz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+    distance_yz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+
+    float* restrict mask_xy_closest = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
+    float* restrict mask_xz_closest = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
+    float* restrict mask_yz_closest = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
+
+
+    float* restrict mask_tie_xy_xz = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
+    float* restrict mask_tie_xy_yz = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
+    float* restrict mask_tie_xz_yz = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
+
+    float* restrict buffer_zx_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+    float* restrict buffer_zy_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+    float* restrict buffer_xz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+    float* restrict buffer_yz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+    float* restrict buffer_xy_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+    float* restrict buffer_yx_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+
+    float* restrict buffer_conflict_xz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+    float* restrict buffer_conflict_yz_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
+    float* restrict buffer_conflict_xy_block = (float *) _mm_malloc(block_size * block_size * sizeof(float), VECALIGN);
     for(xb = 0; xb < n; xb += block_size){
         for(yb = xb; yb < n; yb += block_size){
             time_start = omp_get_wtime();
@@ -1430,23 +1570,24 @@ void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
                         //     zstart = y + 1;
                         // }
                             // zstart = (yb == zb) ? y + 1 : 0;
-                            dist_xy = distance_xy_block[y + x * block_size];
-                            // loop_len = block_size - zstart;
-                            contains_tie = 0.f;
+                        dist_xy = distance_xy_block[y + x * block_size];
+                        // loop_len = block_size - zstart;
+                        contains_tie = 0.f;
                         if(yb == zb){
                             loop_len = block_size - y - 1;
                             for (z = y + 1; z < block_size; ++z){
                                 //compute masks for conflict blocks.
-                                distance_check_1 = dist_xy < distance_xz_block[z + x * block_size];
-                                distance_check_2 = dist_xy < distance_yz_block[z + y * block_size];
-                                mask_xy_closest[z] = distance_check_1 & distance_check_2;
+                                distance_check_1_mask = dist_xy < distance_xz_block[z + x * block_size];
+                                distance_check_2_mask = dist_xy < distance_yz_block[z + y * block_size];
+                                mask_xy_closest[z] = distance_check_1_mask & distance_check_2_mask;
 
-                                distance_check_1 = distance_xz_block[z + x * block_size] < dist_xy;
-                                distance_check_2 =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
-                                mask_xz_closest[z] = distance_check_1 & distance_check_2;
+                                distance_check_1_mask = distance_xz_block[z + x * block_size] < dist_xy;
+                                distance_check_2_mask =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
+                                mask_xz_closest[z] = distance_check_1_mask & distance_check_2_mask;
                                 
-                                distance_check_1 = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];distance_check_2 = distance_yz_block[z + y * block_size] < dist_xy;
-                                mask_yz_closest[z] = distance_check_1 & distance_check_2;
+                                distance_check_1_mask = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];
+                                distance_check_2_mask = distance_yz_block[z + y * block_size] < dist_xy;
+                                mask_yz_closest[z] = distance_check_1_mask & distance_check_2_mask;
                                 // contains_tie += (1.f + (-mask_xy_closest[z]))*(1.f + (-mask_xz_closest[z]))*(1.f + (-mask_yz_closest[z]));
                             }
                             conflict_xy_val = conflict_xy_block[y];
@@ -1513,16 +1654,17 @@ void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
                             loop_len = block_size;
                             for (z = 0; z < block_size; ++z){
                                 //compute masks for conflict blocks.
-                                distance_check_1 = dist_xy < distance_xz_block[z + x * block_size];
-                                distance_check_2 = dist_xy < distance_yz_block[z + y * block_size];
-                                mask_xy_closest[z] = distance_check_1 & distance_check_2;
+                                distance_check_1_mask = dist_xy < distance_xz_block[z + x * block_size];
+                                distance_check_2_mask = dist_xy < distance_yz_block[z + y * block_size];
+                                mask_xy_closest[z] = distance_check_1_mask & distance_check_2_mask;
 
-                                distance_check_1 = distance_xz_block[z + x * block_size] < dist_xy;
-                                distance_check_2 =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
-                                mask_xz_closest[z] = distance_check_1 & distance_check_2;
+                                distance_check_1_mask = distance_xz_block[z + x * block_size] < dist_xy;
+                                distance_check_2_mask =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
+                                mask_xz_closest[z] = distance_check_1_mask & distance_check_2_mask;
                                 
-                                distance_check_1 = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];distance_check_2 = distance_yz_block[z + y * block_size] < dist_xy;
-                                mask_yz_closest[z] = distance_check_1 & distance_check_2;
+                                distance_check_1_mask = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];
+                                distance_check_2_mask = distance_yz_block[z + y * block_size] < dist_xy;
+                                mask_yz_closest[z] = distance_check_1_mask & distance_check_2_mask;
                                 // contains_tie += (1.f + (-mask_xy_closest[z]))*(1.f + (-mask_xz_closest[z]))*(1.f + (-mask_yz_closest[z]));
                             }
                             conflict_xy_val = conflict_xy_block[y];
@@ -1656,10 +1798,10 @@ void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
     _mm_free(mask_xy_closest); _mm_free(mask_xz_closest); _mm_free(mask_yz_closest);
     _mm_free(buffer_conflict_xz_block); _mm_free(buffer_conflict_yz_block); _mm_free(buffer_conflict_xy_block);
     _mm_free(conflict_matrix);
-
+    _mm_free(conflict_matrix_int);
     _mm_free(mask_xy_closest_int); _mm_free(mask_xz_closest_int); _mm_free(mask_yz_closest_int);
     _mm_free(buffer_conflict_xz_block_int); _mm_free(buffer_conflict_yz_block_int); _mm_free(buffer_conflict_xy_block_int);
-    _mm_free(conflict_matrix_int);
+
 }
 
 void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int block_size){
