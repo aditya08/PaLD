@@ -191,7 +191,7 @@ void pald_allz(float* restrict D, float beta, int n, float* restrict C, int bloc
             }
             for (k = 0; k < block_size*block_size; ++k)
                 conflict_block[k] = 1.0f/conflict_block[k];
-
+            // print_matrix(n, n, conflict_block);
             conflict_loop_time += omp_get_wtime() - time_start;
             time_start = omp_get_wtime();
             // update cohesion values according to conflicts between X and Y
@@ -312,6 +312,14 @@ void pald_allz_experimental(float* restrict D, float beta, int n, float* restric
     __mmask16 cmp_result;
     __m512i all_ones = _mm512_set1_epi32(1);
     __m512i masked_ones;
+    __m512 beta_avx = _mm512_set1_ps(beta);
+    __m512 dist_yz_avx;
+    __m512 distance_block_avx;
+    __m512 dist_xz_avx;
+    __m512 cutoff_avx;
+    __m512i conflict_block_avx;
+    __m512i all_zeros = _mm512_setzero_epi32();
+
     unsigned short * mask_conflict = (unsigned short *) _mm_malloc(block_size * sizeof(unsigned short), VECALIGN);
     float dist_yz;
     char mask_z_in_y_cutoff  = 0;
@@ -361,20 +369,40 @@ void pald_allz_experimental(float* restrict D, float beta, int n, float* restric
                     /*
                     * Need to implement intrinsics to count number of bits set to 1 in cmp_result.
                     * Significant slowdown when you do conflict_block_int[idx] += cmp_result, due to cast op and no vectorization.
+                    * Use _mm512_set1_ps to load beta and dist_yz into two 512-registers.
+                    * Use _mm512_load_ps to load 16 floats from distance_block into one 512-register.
                     */
-                    for (i = 0; i < ib; ++i) {
-                        distance_check_1 = dist_yz <= beta * distance_block[i + j * x_block];
-                        distance_check_2 = DXz[i] <= beta * distance_block[i + j * x_block];
-                        cmp_result = distance_check_1 | distance_check_2;
+                   if(x != y){
+                        dist_yz_avx = _mm512_set1_ps(dist_yz);
+                        for (i = 0; i < ib; i+=16) {
+                            distance_block_avx = _mm512_load_ps(distance_block + i + j * x_block);
+                            dist_xz_avx = _mm512_load_ps(DXz + i);
+                            conflict_block_avx = _mm512_load_epi32(conflict_block_int + i + j * x_block);
+                            cutoff_avx = _mm512_mul_ps(beta_avx, distance_block_avx);
+                            distance_check_1 = _mm512_cmple_ps_mask(dist_yz_avx, cutoff_avx);
+                            distance_check_2 = _mm512_cmple_ps_mask(dist_xz_avx, cutoff_avx);
+                            cmp_result = distance_check_1 | distance_check_2;
+                            _mm512_store_epi32(conflict_block_int + i + j * x_block, _mm512_mask_add_epi32(conflict_block_avx, cmp_result, conflict_block_avx, all_ones));
+                            // distance_check_1 = dist_yz <= beta * distance_block[i + j * x_block];
+                            // distance_check_2 = DXz[i] <= beta * distance_block[i + j * x_block];
+                            // cmp_result = distance_check_1 | distance_check_2;
 
-                        // conflict_block_int[i + j * x_block] += _mm512_mask_reduce_add_epi32(cmp_result, all_ones);
-                        // conflict_block_int[i + j * x_block] += distance_check_1 | distance_check_2;
-                        // printf("%d, %d\n",_mm512_kor(distance_check_1, distance_check_2), distance_check_1 | distance_check_2);
-                        // if (DYz[j] <= beta * distance_block[i + j * x_block] || DXz[i] <= beta * distance_block[i + j * x_block]){
-                        //     ++conflict_block_int[i + j * x_block];
-                        // }
-            
-                    }
+                            // conflict_block_int[i + j * x_block] += _mm512_mask_reduce_add_epi32(cmp_result, all_ones);
+                            // conflict_block_int[i + j * x_block] += distance_check_1 | distance_check_2;
+                            // printf("%d, %d\n",_mm512_kor(distance_check_1, distance_check_2), distance_check_1 | distance_check_2);
+                            // if (DYz[j] <= beta * distance_block[i + j * x_block] || DXz[i] <= beta * distance_block[i + j * x_block]){
+                            //     ++conflict_block_int[i + j * x_block];
+                            // }
+                
+                        }
+                   }
+                   else{
+                        for(i = 0; i < ib; ++i){
+                            distance_check_1 = dist_yz <= beta * distance_block[i + j * x_block];
+                            distance_check_2 = DXz[i] <= beta * distance_block[i + j * x_block];
+                            conflict_block_int[i + j * x_block] += distance_check_1 | distance_check_2;
+                        }
+                   }
                 }
                 // update pointers to subcolumns of D
                 DXz += n;
@@ -382,7 +410,7 @@ void pald_allz_experimental(float* restrict D, float beta, int n, float* restric
             }
             for (k = 0; k < block_size*block_size; ++k)
                 conflict_block[k] = 1.0f/conflict_block_int[k];
-
+            // print_matrix(n, n, conflict_block);
             conflict_loop_time += omp_get_wtime() - time_start;
             time_start = omp_get_wtime();
             // update cohesion values according to conflicts between X and Y
