@@ -67,8 +67,8 @@ int main(int argc, char **argv) {
         start = omp_get_wtime();
         // pald_triplet_L2_blocked(D, 1, n, C1, triplet_L1_cache_size,triplet_L2_cache_size);
         // pald_triplet(D, 1, n, C1, triplet_L1_cache_size);
-        // pald_triplet_intrin(D, 1, n, C1, triplet_L1_cache_size);
-        pald_allz_experimental(D, 1, n, C1, allz_cache_size);
+        pald_triplet_intrin(D, 1, n, C1, triplet_L1_cache_size);
+        // pald_allz_experimental(D, 1., n, C1, allz_cache_size);
         naive_time += omp_get_wtime() - start;
     }
     // print_out(n,C1);
@@ -76,8 +76,8 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; ++i){
         memset(C2, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_allz(D, 1, n, C2, allz_cache_size);
-        // pald_triplet(D, 1, n, C2, triplet_L1_cache_size);
+        // pald_allz(D, 1., n, C2, allz_cache_size);
+        pald_triplet(D, 1, n, C2, triplet_L1_cache_size);
         opt_time += omp_get_wtime() - start;
     }
     // print_out(n,C2);
@@ -115,10 +115,10 @@ int main(int argc, char **argv) {
     printf("=============================================\n");
     printf("           Summary, n: %d\n", n);
     printf("=============================================\n");
-    // printf("Triplet int-ops + baseline Blocked time: %.5fs\n",naive_time/ntrials);
-    // printf("Triplet baseline time: %.5fs\n",opt_time/ntrials);
-    printf("Allz experimental time: %.5fs\n",naive_time/ntrials);
-    printf("Allz optimized time: %.5fs\n",opt_time/ntrials);
+    printf("Triplet skip-ties + int-ops + baseline time: %.5fs\n",naive_time/ntrials);
+    printf("Triplet baseline time: %.5fs\n",opt_time/ntrials);
+    // printf("Allz experimental time: %.5fs\n",naive_time/ntrials);
+    // printf("Allz optimized time: %.5fs\n",opt_time/ntrials);
 
     printf("Speedup: %.2f\n", opt_time/naive_time);
     printf("Maximum difference: %1.8e\n\n", maxdiff);
