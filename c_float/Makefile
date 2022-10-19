@@ -1,5 +1,5 @@
 CC = icc
-CFLAGS = -xCORE-AVX512 -qopt-zmm-usage=high -Ofast -Wall -ipo -qopenmp -DEBUG -DVECALIGN=64 -fno-alias -align -fbuiltin -finline -finline-functions -g -fno-exceptions -simd -simd-function-pointers -qopt-multiple-gather-scatter-by-shuffles -qopt-streaming-stores=auto -qopt-subscript-in-range -vec-threshold=0 
+CFLAGS = -xCORE-AVX512 -qopt-zmm-usage=high -Ofast -Wall -ipo -qopenmp -DEBUG -DVECALIGN=64 -fno-alias -align -fbuiltin -finline -finline-functions -g -fno-exceptions -simd -simd-function-pointers -qopt-multiple-gather-scatter-by-shuffles -qopt-streaming-stores=auto -qopt-subscript-in-range -vec-threshold=0 -I/opt/intel/oneapi/advisor/2022.1.0/include/
 #-qopt-report-phase=vec -qopt-report=5 -qopt-report-file=stdout 
 
 LDFLAGS = -qopenmp -DEBUG -g -qmkl

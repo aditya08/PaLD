@@ -77,7 +77,9 @@ int main(int argc, char **argv) {
         memset(C2, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
         // pald_allz(D, 1., n, C2, allz_cache_size);
-        pald_triplet(D, 1, n, C2, triplet_L1_cache_size);
+        // pald_triplet(D, 1, n, C2, triplet_L1_cache_size);
+        pald_triplet_intrin_openmp(D, 1, n, C1, triplet_L1_cache_size);
+        // pald_triplet_L2_blocked(D, 1, n, C2, triplet_L1_cache_size,triplet_L2_cache_size);
         opt_time += omp_get_wtime() - start;
     }
     // print_out(n,C2);
@@ -116,15 +118,15 @@ int main(int argc, char **argv) {
     printf("           Summary, n: %d\n", n);
     printf("=============================================\n");
     printf("Triplet skip-ties + int-ops + baseline time: %.5fs\n",naive_time/ntrials);
-    printf("Triplet baseline time: %.5fs\n",opt_time/ntrials);
+    printf("Triplet L2-blocked, skip-ties, int-ops time: %.5fs\n",opt_time/ntrials);
     // printf("Allz experimental time: %.5fs\n",naive_time/ntrials);
     // printf("Allz optimized time: %.5fs\n",opt_time/ntrials);
 
-    printf("Speedup: %.2f\n", opt_time/naive_time);
+    printf("Speedup: %.2f\n", naive_time/opt_time);
     printf("Maximum difference: %1.8e\n\n", maxdiff);
    
     printf("SGEMM time: %.5fs\n", sgemm_time/ntrials);
-    printf("SGEMM Speedup: %.2f\n", naive_time/sgemm_time);
+    printf("SGEMM Speedup: %.2f\n", opt_time/sgemm_time);
     _mm_free(D);
     _mm_free(C2);
     _mm_free(C1);
