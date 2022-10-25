@@ -2944,7 +2944,7 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, 
     double time_start = 0.0, conflict_loop_time = 0.0, cohesion_loop_time;
     // memset(conflict_matrix_int, 0, n * n * sizeof(unsigned int));
     time_start = omp_get_wtime();
-    #pragma omp parallel shared(D, conflict_matrix_int, conflict_matrix) num_threads(nthreads)
+    #pragma omp parallel shared(D, conflict_matrix_int, conflict_matrix, n) num_threads(nthreads) 
     {
         // printf("nthreads: %d\n", omp_get_num_threads());
         float* distance_xy_block;
@@ -3129,8 +3129,8 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, 
                 }
             }
         }
-        #pragma omp taskwait
-        #pragma omp parallel for shared(conflict_matrix, conflict_matrix_int, n)
+        #pragma omp barrier
+        #pragma omp for
         for(i = 0; i < n * n; ++i){
             // conflict_matrix[i] = 1.f/conflict_matrix[i];
             conflict_matrix[i] = 1.f/conflict_matrix_int[i];
@@ -3145,7 +3145,7 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, 
     _mm_free(conflict_matrix_int);
     conflict_loop_time = omp_get_wtime() - time_start;
     time_start = omp_get_wtime();
-    #pragma omp parallel shared(D, conflict_matrix, C, n) num_threads(nthreads)
+    #pragma omp parallel shared(C, D, conflict_matrix, n) num_threads(nthreads)
     {
         int iters = 0;
         double time_start = 0.0, time_start2 = 0.0;
@@ -3162,7 +3162,7 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, 
         // block_size /= 2;
 
         float sum;
-        #pragma omp parallel for private(i, j, sum) shared(C, conflict_matrix, n)
+        #pragma omp for
         for (i = 0; i < n; ++i){
             sum = 0.f;
             for (j = 0; j < i; ++j){
@@ -3291,7 +3291,6 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, 
                 }
             }
         }
-        #pragma omp taskwait
     }
     // print_matrix(n, n, C);
     _mm_free(conflict_matrix);
