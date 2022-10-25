@@ -78,12 +78,12 @@ int main(int argc, char **argv) {
         start = omp_get_wtime();
         // pald_allz(D, 1., n, C2, allz_cache_size);
         // pald_triplet(D, 1, n, C2, triplet_L1_cache_size);
-        pald_triplet_intrin_openmp(D, 1, n, C1, triplet_L1_cache_size);
+        pald_triplet_openmp(D, 1, n, C2, triplet_L1_cache_size/8, 32);
         // pald_triplet_L2_blocked(D, 1, n, C2, triplet_L1_cache_size,triplet_L2_cache_size);
         opt_time += omp_get_wtime() - start;
     }
+    //print out triplet algorithms result
     // print_out(n,C2);
-    //print out block algorithm result
     // print_out(n, C1);
     double sgemm_time = 0.;
     for(int i = 0; i < ntrials; ++i){
