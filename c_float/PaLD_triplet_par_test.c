@@ -72,14 +72,15 @@ int main(int argc, char **argv) {
     // FILE *f = fopen("dist_mat.bin", "wb");
     // fwrite(D, sizeof(float), num_gen, f);
     // fclose(f);
-    int ntrials = 1;
+    int ntrials = 5;
     //computing C with optimal block algorithm
     double start = 0., naive_time = 0., omp_time = 0.;
     for (int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
         //pald_triplet_naive(D, 1, n, C1);
-        pald_allz(D, 1, n, C1, 256);
+        pald_triplet_intrin(D, 1., n, C1, 256);
+        // pald_allz(D, 1, n, C1, 256);
         naive_time += omp_get_wtime() - start;
     }
 
@@ -87,8 +88,9 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; ++i){
         memset(C2, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet_blocked(D, 1, n, C2, nthreads);
+        // pald_triplet_blocked(D, 1, n, C2, nthreads);
         //pald_triplet_naive(D, 1, n, C2);
+        pald_triplet_openmp(D, 1., n, C2, 256/4, nthreads);
         //pald_triplet_naive_openmp(D, 1, n, C2, nthreads);
         omp_time += omp_get_wtime() - start;
     }
@@ -127,8 +129,8 @@ int main(int argc, char **argv) {
     printf("=============================================\n");
     printf("           Summary, n: %d\n", n);
     printf("=============================================\n");
-    printf("Avg. Sequential time: %.5fs\n",naive_time);
-    printf("Avg. Parallel   time: %.5fs, nthreads: %d\n", omp_time, nthreads);
+    printf("Avg. Sequential time: %.5fs\n",naive_time/ntrials);
+    printf("Avg. Parallel   time: %.5fs, nthreads: %d\n", omp_time/ntrials, nthreads);
     printf("Speedup: %.2f\n",naive_time/omp_time);
     printf("Parallel Efficiency: %2.2f\n", naive_time/omp_time/nthreads*100);
     printf("Maximum difference: %1.8e\n\n", maxdiff);

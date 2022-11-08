@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
     double  msec_opt = 1. * diff / CLOCKS_PER_SEC;
     
     //print out block algorithm result
-    //print_out(n, C);
+    // print_out(n, C1);
 
 
     //computing C with original algorithm  
@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
 
 
     //print out result of original algorithm
-    //print_out(n, C);
+    // print_out(n, C2);
     // print out for error checking
 
     // compute max norm error between two cohesion matrices
