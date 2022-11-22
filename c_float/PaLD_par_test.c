@@ -13,8 +13,8 @@ int main(int argc, char **argv) {
     // initialize timers
     double start = 0.0, sum = 0.0, time_seq = 0.0 , time_par = 0.0;
     int ntrials = 5;
-    if ((argc != 5) || !(n = atoi(argv[1])) || !(seq_block_size = atoi(argv[2])) || !(omp_block_size = atoi(argv[3])) || !(t = atoi(argv[4])) ) {
-        fprintf(stderr, "Usage: ./name mat_dim seq_block_size openmp_block_size num_threads\n");
+    if ((argc != 6) || !(n = atoi(argv[1])) || !(seq_block_size = atoi(argv[2])) || !(omp_block_size = atoi(argv[3])) || !(t = atoi(argv[4])) || ! (ntrials = atoi(argv[5]))) {
+        fprintf(stderr, "Usage: ./name mat_dim seq_block_size openmp_block_size num_threads num_trials\n");
         exit(-1);
     }
     unsigned int num_gen = n * n;

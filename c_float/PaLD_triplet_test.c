@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
     sgemm_rand(A, num_gen, -1.f, 1.f, 42);
     sgemm_rand(B, num_gen, -1.f, 1.f, 42);
 
-    
+
     // FILE *f = fopen("dist_mat.bin", "wb");
     // fwrite(D, sizeof(float), num_gen, f);
     // fclose(f);
@@ -66,9 +66,9 @@ int main(int argc, char **argv) {
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
         // pald_triplet_L2_blocked(D, 1, n, C1, triplet_L1_cache_size,triplet_L2_cache_size);
-        pald_triplet(D, 1., n, C1, triplet_L1_cache_size);
-        // pald_triplet_intrin(D, 1, n, C1, triplet_L1_cache_size);
-        // pald_allz_experimental(D, 1., n, C1, allz_cache_size);
+        // pald_triplet(D, 1., n, C1, triplet_L1_cache_size);
+        pald_triplet_intrin(D, 1, n, C1, triplet_L1_cache_size);
+        // pald_triplet_naive(D, 1., n, C1);
         naive_time += omp_get_wtime() - start;
     }
     // print_out(n,C1);
@@ -76,15 +76,15 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; ++i){
         memset(C2, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_allz(D, 1., n, C2, allz_cache_size);
+        // pald_triplet_intrin(D, 1, n, C2, triplet_L1_cache_size);
         // pald_triplet(D, 1, n, C2, triplet_L1_cache_size);
-        // pald_triplet_openmp(D, 1, n, C2, triplet_L1_cache_size/2, 8);
         // pald_triplet_L2_blocked(D, 1, n, C2, triplet_L1_cache_size,triplet_L2_cache_size);
+        pald_triplet_blocked(D, 1., n, C2, triplet_L1_cache_size);
         opt_time += omp_get_wtime() - start;
     }
     //print out triplet algorithms result
-    // print_out(n,C2);
-    // print_out(n, C1);
+    print_out(n,C2);
+    print_out(n, C1);
     double sgemm_time = 0.;
     for(int i = 0; i < ntrials; ++i){
         memset(C, 0, sizeof(float)*num_gen);
@@ -94,8 +94,8 @@ int main(int argc, char **argv) {
         sgemm_time += omp_get_wtime() - start;
     }
 
-    //computing C with original algorithm  
-    
+    //computing C with original algorithm
+
     // start = clock();
     // //for (int i = 0; i < 4; ++i)
     // pald_allz_naive(D, 1, n, C2);
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
     // print out for error checking
 
     // compute max norm error between two cohesion matrices
-    
+
     float d, maxdiff = 0.;
     for (i = 0; i < num_gen; i++) {
         d = fabs(C1[i]-C2[i]);
@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
 
     printf("Speedup: %.2f\n", naive_time/opt_time);
     printf("Maximum difference: %1.8e\n\n", maxdiff);
-   
+
     printf("SGEMM time: %.5fs\n", sgemm_time/ntrials);
     printf("SGEMM Speedup: %.2f\n", opt_time/sgemm_time);
     _mm_free(D);
