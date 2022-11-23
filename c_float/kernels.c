@@ -1588,31 +1588,30 @@ void pald_triplet_blocked(float* restrict D, float beta, int n, float* restrict 
                                 cohesion_zy_block[y] += 1.f/conflict_xy_block[y];
                                 cohesion_yz_block[z] += 1.f/conflict_xz_block[z];
                             }
-                            else{
-                                continue;
-                                if (distance_xy_block[y + x * block_size] == distance_xz_block[z + x * block_size]){
-                                    yx_reduction += 1.f/conflict_xz_block[z];
-                                    xy_reduction += .5f/conflict_yz_block[z];
-                                    cohesion_xz_block[z] += .5f/conflict_yz_block[z];
-                                    cohesion_zx_block[x] += 1.f/conflict_xy_block[y];
-                                }
+                            // else{
+                            //     if (distance_xy_block[y + x * block_size] == distance_xz_block[z + x * block_size]){
+                            //         yx_reduction += 1.f/conflict_xz_block[z];
+                            //         xy_reduction += .5f/conflict_yz_block[z];
+                            //         cohesion_xz_block[z] += .5f/conflict_yz_block[z];
+                            //         cohesion_zx_block[x] += 1.f/conflict_xy_block[y];
+                            //     }
 
-                                if (distance_xz_block[z + x * block_size] == distance_yz_block[z + y * block_size]){
-                                    cohesion_zx_block[x] += .5f / conflict_xy_block[y];
-                                    cohesion_zy_block[y] += .5f / conflict_xy_block[y];
+                            //     if (distance_xz_block[z + x * block_size] == distance_yz_block[z + y * block_size]){
+                            //         cohesion_zx_block[x] += .5f / conflict_xy_block[y];
+                            //         cohesion_zy_block[y] += .5f / conflict_xy_block[y];
 
-                                    cohesion_xz_block[z] += 1.f / conflict_yz_block[z];
-                                    cohesion_yz_block[z] += 1.f / conflict_xz_block[z];
-                                }
+                            //         cohesion_xz_block[z] += 1.f / conflict_yz_block[z];
+                            //         cohesion_yz_block[z] += 1.f / conflict_xz_block[z];
+                            //     }
 
-                                if (distance_xy_block[y + x * block_size] == distance_yz_block[z + y * block_size]){
-                                    yx_reduction += .5f/conflict_xz_block[z];
-                                    xy_reduction += 1.f/conflict_yz_block[z];
+                            //     if (distance_xy_block[y + x * block_size] == distance_yz_block[z + y * block_size]){
+                            //         yx_reduction += .5f/conflict_xz_block[z];
+                            //         xy_reduction += 1.f/conflict_yz_block[z];
 
-                                    cohesion_zy_block[y] += 1.f/conflict_xy_block[y];
-                                    cohesion_yz_block[z] += .5f/conflict_xz_block[z];
-                                }
-                            }
+                            //         cohesion_zy_block[y] += 1.f/conflict_xy_block[y];
+                            //         cohesion_yz_block[z] += .5f/conflict_xz_block[z];
+                            //     }
+                            // }
                             cohesion_zx_block += n;
                             cohesion_zy_block += n;
                         }
@@ -3101,7 +3100,6 @@ void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
                     }
                     conflict_xy_block += n;
                 }
-
 
                 time_start2 = omp_get_wtime();
                 if(xb == yb){
