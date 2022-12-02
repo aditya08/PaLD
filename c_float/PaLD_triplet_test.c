@@ -79,8 +79,8 @@ int main(int argc, char **argv) {
         // pald_triplet_intrin(D, 1, n, C2, triplet_L1_cache_size);
         // pald_triplet(D, 1, n, C2, triplet_L1_cache_size);
         // pald_triplet_L2_blocked(D, 1, n, C2, triplet_L1_cache_size,triplet_L2_cache_size);
-        pald_triplet_intrin_powersoftwo(D, 1., n, C2, triplet_L1_cache_size);
-        // pald_triplet_blocked(D, 1., n, C2, triplet_L1_cache_size);
+        // pald_triplet_intrin_powersoftwo(D, 1., n, C2, triplet_L1_cache_size);
+        pald_triplet_blocked(D, 1., n, C2, triplet_L1_cache_size);
         opt_time += omp_get_wtime() - start;
     }
     //print out triplet algorithms result

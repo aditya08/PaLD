@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
 
     //initializing testing environment spec
     int n, seq_block_size, i, nthreads, omp_block_size;
-    
+
     if ((argc != 5) || !(n = atoi(argv[1])) || !(seq_block_size = atoi(argv[2])) || !(omp_block_size = atoi(argv[3])) ||  !(nthreads = atoi(argv[4]))) {
         fprintf(stderr, "Usage: ./name distance_mat_size sequential_block_size openmp_block_size num_threads\n");
         exit(-1);
@@ -92,8 +92,8 @@ int main(int argc, char **argv) {
         //pald_triplet_naive_openmp(D, 1, n, C2, nthreads);
         omp_time += omp_get_wtime() - start;
     }
-    
-    
+
+
     //print out block algorithm result
     //print_out(n, C1);
     // print_diag(n, C1);
@@ -101,8 +101,8 @@ int main(int argc, char **argv) {
     //print_diag(n, C2);
 
 
-    //computing C with original algorithm  
-    
+    //computing C with original algorithm
+
     // start = clock();
     // //for (int i = 0; i < 4; ++i)
     // pald_allz_naive(D, 1, n, C2);
@@ -115,7 +115,7 @@ int main(int argc, char **argv) {
     // print out for error checking
 
     // compute max norm error between two cohesion matrices
-    
+
     float d, maxdiff = 0.;
     for (i = 0; i < num_gen; i++) {
         d = fabs(C1[i]-C2[i]);
