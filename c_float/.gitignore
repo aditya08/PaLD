@@ -5,6 +5,8 @@ PaLD_triplet_par_test
 PaLD_sgemm_test
 PaLD_triplet_l2blocking_test
 PaLD_vtune
+PaLD_triplet_omp_benchmark
+PaLD_triplet_benchmark
 *.o
 *.optrpt
 *.dump

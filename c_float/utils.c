@@ -61,7 +61,7 @@ void dist_mat_gen2D(float *D, int n, int min, int max, int seed, char dist) {
             if(dist == '1') {
                 // L1 distance
                 D[i * n + j] = fabs(x[i] - x[j]) + fabs(y[i] - y[j]);
-                
+
             } else if(dist == '2') {
                 // L2 distance
                 D[i * n + j] = sqrt(pow(x[i] - x[j],2) + pow(y[i] - y[j],2));
@@ -96,10 +96,10 @@ float triplet_ops(int n, int block_size){
 
     // there are (nblocks choose 3) unique triplet blocks with no symmetry.
     float nblocks_nosym = (nblocks)*(nblocks - 1)*(nblocks - 2)/6;
-    
+
     // there are 2*(nblocks choose 2) unique pairs of blocks for which the third block may be symmetric.
     float nblocks_singlesym = (nblocks)*(nblocks - 1);
-    
+
     // there are nblocks for which all 3 blocks can be symmetric.
     float nblocks_allsym = (nblocks);
 
@@ -107,7 +107,7 @@ float triplet_ops(int n, int block_size){
     // ops count includes distance matrix comparisons (required for conflict and cohesion matrices) and FMAs (only for cohesion matrix).
     float work_nosym = 3*(block_size*block_size*block_size)*nblocks_nosym;
     float work_singlesym = 3*(block_size)*((block_size)*(block_size - 1)/2)*nblocks_singlesym;
-    float work_allsym = ((block_size)*(block_size - 1)*(block_size - 2)/2)*nblocks_allsym;
+    float work_allsym = 3*((block_size)*(block_size - 1)*(block_size - 2)/2)*nblocks_allsym;
 
     return work_nosym + work_singlesym + work_allsym;
 

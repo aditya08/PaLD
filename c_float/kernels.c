@@ -2452,15 +2452,15 @@ void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
     // char print_out = 0;
     double time_start = 0.0, time_start2 = 0.0;
     double memops_loop_time = 0.0, conflict_loop_time = 0.0, cohesion_loop_time = 0.0;
-    int xb, yb, zb, x, y, z;
-    int i, j, k;
-    int x_block, y_block, z_block;
+    unsigned int xb, yb, zb, x, y, z;
+    unsigned int i, j, k;
+    unsigned int x_block, y_block, z_block;
     // int size_xy = block_size, size_xz = block_size, size_yz = block_size;
-    int xend, ystart, zstart;
+    unsigned int xend, ystart, zstart;
     float xy_reduction = 0.f, yx_reduction = 0.f, cohesion_sum = 0.f;
     // compute conflict focus sizes.
-    int iters = 0;
-    int idx;
+    unsigned int iters = 0;
+    unsigned int idx;
     time_start = omp_get_wtime();
     for (i = 0; i < n; ++i){
         for (j = i + 1; j < n; ++j){
@@ -2533,9 +2533,9 @@ void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
                             loop_len = z_block - zstart;
                             if(yb == zb){
                                 // for (z = y + 1; z < block_size; ++z){
+                                idx = y + 1;
                                 #pragma unroll(16)
                                 for (z = 0; z < loop_len; ++z){
-                                    idx = z + y + 1;
                                     //compute masks for conflict blocks.
 
                                     distance_check_1_mask = dist_xy < distance_xz_block[idx + x * block_size];
@@ -2554,6 +2554,8 @@ void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
                                     xy_reduction_int += scalar_xz_closest_int + scalar_yz_closest_int;
                                     buffer_conflict_yz_block_int[idx + y * block_size] += scalar_xy_closest_int + scalar_xz_closest_int;
                                     buffer_conflict_xz_block_int[idx + x * block_size] += scalar_xy_closest_int + scalar_yz_closest_int;
+
+                                    idx++;
                                 }
 
                                 buffer_conflict_xy_block_int[y + x * block_size] += xy_reduction_int;
@@ -2617,9 +2619,9 @@ void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
                             // contains_tie = 0.f;
                             loop_len = z_block - zstart;
                             if(yb == zb){
+                                idx = y + 1;
                                 #pragma unroll(16)
                                 for (z = 0; z < loop_len; ++z){
-                                    idx = z + y + 1;
                                     //compute masks for conflict blocks.
 
                                     distance_check_1_mask = dist_xy < distance_xz_block[idx + x * block_size];
@@ -2638,6 +2640,8 @@ void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
                                     xy_reduction_int += scalar_xz_closest_int + scalar_yz_closest_int;
                                     buffer_conflict_yz_block_int[idx + y * block_size] += scalar_xy_closest_int + scalar_xz_closest_int;
                                     buffer_conflict_xz_block_int[idx + x * block_size] += scalar_xy_closest_int + scalar_yz_closest_int;
+
+                                    idx++;
                                 }
                                 buffer_conflict_xy_block_int[y + x * block_size] += xy_reduction_int;
                             }
@@ -2656,6 +2660,7 @@ void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
                                     distance_check_1_mask = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];
                                     distance_check_2_mask = distance_yz_block[z + y * block_size] < dist_xy;
                                     scalar_yz_closest_int = distance_check_1_mask & distance_check_2_mask;
+
                                     xy_reduction_int += scalar_xz_closest_int + scalar_yz_closest_int;
                                     buffer_conflict_yz_block_int[z + y * block_size] += scalar_xy_closest_int + scalar_xz_closest_int;
                                     buffer_conflict_xz_block_int[z + x * block_size] += scalar_xy_closest_int + scalar_yz_closest_int;
@@ -3069,27 +3074,27 @@ void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
                             #pragma unroll(8)
                             //update cohesion blocks.
                             for (z = 0; z < z_block; ++z){
-                                // xy closest pair.
                                 distance_check_1_mask = dist_xy < distance_xz_block[z + x * block_size];
                                 distance_check_2_mask = dist_xy < distance_yz_block[z + y * block_size];
                                 scalar_xy_closest = distance_check_1_mask & distance_check_2_mask;
 
-                                xy_reduction += scalar_xy_closest*buffer_conflict_yz_block[z + y * block_size];
-                                yx_reduction += scalar_xy_closest*buffer_conflict_xz_block[z + x * block_size];
-
-                                // xz closest pair.
                                 distance_check_1_mask = distance_xz_block[z + x * block_size] < dist_xy;
                                 distance_check_2_mask =  distance_xz_block[z + x * block_size] < distance_yz_block[z + y * block_size];
                                 scalar_xz_closest = distance_check_1_mask & distance_check_2_mask;
 
-                                buffer_xz_block[z + x * block_size] += scalar_xz_closest*buffer_conflict_yz_block[z + y * block_size];
-                                buffer_zx_block[z + x * block_size] += scalar_xz_closest*conflict_xy_val;
-
-                                //yz closest pair.
                                 distance_check_1_mask = distance_yz_block[z + y * block_size] < distance_xz_block[z + x * block_size];
                                 distance_check_2_mask = distance_yz_block[z + y * block_size] < dist_xy;
                                 scalar_yz_closest = distance_check_1_mask & distance_check_2_mask;
 
+                                // xy closest pair.
+                                xy_reduction += scalar_xy_closest*buffer_conflict_yz_block[z + y * block_size];
+                                yx_reduction += scalar_xy_closest*buffer_conflict_xz_block[z + x * block_size];
+
+                                // xz closest pair
+                                buffer_xz_block[z + x * block_size] += scalar_xz_closest*buffer_conflict_yz_block[z + y * block_size];
+                                buffer_zx_block[z + x * block_size] += scalar_xz_closest*conflict_xy_val;
+
+                                //yz closest pair.
                                 buffer_yz_block[z + y * block_size] += scalar_yz_closest*buffer_conflict_xz_block[z + x * block_size];
                                 buffer_zy_block[z + y * block_size] += scalar_yz_closest*conflict_xy_val;
                             }
@@ -3099,7 +3104,7 @@ void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
                     }
                     conflict_xy_block += n;
                 }
-
+                cohesion_loop_time += omp_get_wtime() - time_start;
                 time_start2 = omp_get_wtime();
                 if(xb == yb){
                     cohesion_zx_block = C + xb + zb * n;
@@ -3167,7 +3172,6 @@ void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
                 }
 
                 memops_loop_time += omp_get_wtime() - time_start2;
-                cohesion_loop_time += omp_get_wtime() - time_start;
             }
             time_start2 = omp_get_wtime();
             cohesion_xy_block = C + yb + xb * n;
@@ -4159,7 +4163,7 @@ void pald_triplet_L2_blocked(float* restrict D, float beta, int n, float* restri
         }
     }
 
-    print_matrix(n, n, C);
+    // print_matrix(n, n, C);
     // ANNOTATE_SITE_END("Coh");
     // print_matrix(n, n, C);
 
@@ -4642,15 +4646,15 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, 
 
         // char print_out = 0;
         double time_start = 0.0, time_start2 = 0.0;
-        int xb, yb, zb, x, y, z;
-        int i, j, k;
-        int x_block, y_block, z_block;
+        unsigned int xb, yb, zb, x, y, z;
+        unsigned int i, j, k;
+        unsigned int x_block, y_block, z_block;
         // int size_xy = block_size, size_xz = block_size, size_yz = block_size;
-        int xend, ystart, zstart;
+        unsigned int xend, ystart, zstart;
         float xy_reduction = 0.f, yx_reduction = 0.f, cohesion_sum = 0.f;
         // compute conflict focus sizes.
-        int iters = 0;
-        int idx;
+        unsigned int iters = 0;
+        unsigned int idx;
         #pragma omp for
         for (i = 0; i < n; ++i){
             for (j = i + 1; j < n; ++j){
@@ -4671,9 +4675,6 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, 
                     z_block = ((zb + block_size) < n) ? block_size : (n - zb);
                     // Set DXZ and DYZ blocks.
                     #pragma omp task untied \
-                    shared(n, block_size, D, conflict_matrix_int) \
-                    firstprivate(xb, yb, zb) \
-                    firstprivate(x_block, y_block, z_block) \
                     depend(inout: conflict_matrix[yb + xb * n]) \
                     depend(inout: conflict_matrix[zb + xb * n]) \
                     depend(inout: conflict_matrix[zb + yb * n])
@@ -4855,9 +4856,9 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, 
                 // print_matrix_int(n,n, conflict_matrix_int);
             }
         }
-        #pragma omp barrier
         // #pragma omp master
         // print_matrix_int(n, n, conflict_matrix_int);
+        #pragma omp barrier
         #pragma omp for
         for(i = 0; i < n * n; ++i){
             // conflict_matrix[i] = 1.f/conflict_matrix[i];
@@ -4875,14 +4876,14 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, 
 
     conflict_loop_time = omp_get_wtime() - time_start;
     time_start = omp_get_wtime();
+    // block_size /= 2;
     #pragma omp parallel shared(C, D, conflict_matrix, n) num_threads(nthreads)
     {
-        // block_size /= 2;
-        int iters = 0;
+        unsigned int iters = 0;
         double time_start = 0.0, time_start2 = 0.0;
-        int xb, yb, zb;
-        int x_block, y_block, z_block;
-        int i, j;
+        unsigned int xb, yb, zb;
+        unsigned int x_block, y_block, z_block;
+        unsigned int i, j;
         float sum = 0.f;
         #pragma omp for
         for (i = 0; i < n; ++i){
@@ -4905,9 +4906,6 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, 
                 for(zb = yb; zb < n; zb += block_size){
                     z_block = ((zb + block_size) < n) ? block_size : (n - zb);
                     #pragma omp task untied \
-                    shared(n, block_size, D, conflict_matrix, C) \
-                    firstprivate(xb, yb, zb) \
-                    firstprivate(x_block, y_block, z_block) \
                     depend(inout: C[yb + xb * n]) \
                     depend(inout: C[xb + yb * n]) \
                     depend(inout: C[zb + xb * n]) \
@@ -4916,7 +4914,7 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, 
                     depend(inout: C[yb + zb * n])
                     {
                         // printf("tid: %d, (xb: %d, yb:%d, zb:%d)\n", omp_get_thread_num(), xb/block_size, yb/block_size, zb/block_size);
-                        int x, y, z, idx, zstart, ystart, xend, loop_len;
+                        unsigned int x, y, z, idx, zstart, ystart, xend, loop_len;
                         unsigned int distance_check_1_mask, distance_check_2_mask;
                         float dist_xy = 0.f, conflict_xy_val = 0.f;
                         float xy_reduction = 0.f, yx_reduction = 0.f, cohesion_sum = 0.f;
