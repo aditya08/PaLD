@@ -1,7 +1,7 @@
 #include "kernels.h"
 #include "mkl.h"
 #include "immintrin.h"
-#include <advisor-annotate.h>
+//#include <advisor-annotate.h>
 
 void print_matrix(int size, int stride, float *C) {
     printf("[\n");

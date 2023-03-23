@@ -7,6 +7,7 @@ PaLD_triplet_l2blocking_test
 PaLD_vtune
 PaLD_triplet_omp_benchmark
 PaLD_triplet_benchmark
+*.err
 *.o
 *.optrpt
 *.dump

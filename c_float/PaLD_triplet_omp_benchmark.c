@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
     printf("=============================================\n");
     printf("           Summary, n: %d\n", n);
     printf("=============================================\n");
-    printf("Avg. Parallel jtime: %.5fs, nthreads: %d\n", omp_time/ntrials, nthreads);
+    printf("Avg. Parallel time: %.5fs, nthreads: %d\n", omp_time/ntrials, nthreads);
 
     _mm_free(D);
     _mm_free(C1);
