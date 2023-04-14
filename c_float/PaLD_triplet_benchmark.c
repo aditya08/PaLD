@@ -74,10 +74,8 @@ int main(int argc, char **argv) {
     for (unsigned int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        //pald_triplet_naive(D, 1, n, C1);
         pald_triplet_intrin(D, 1., n, C1, seq_block_size);
-        // pald_triplet_L2_blocked(D, 1., n, C1, seq_block_size, 512);
-        // pald_allz(D, 1, n, C1, 256);
+        // pald_triplet_largezblock(D, 1., n, C1, seq_block_size, 1024);
         naive_time += omp_get_wtime() - start;
     }
 
@@ -110,6 +108,7 @@ int main(int argc, char **argv) {
     printf("triplet ops: %e Gops\n\n", triplet_ops(n, seq_block_size)*10e-9);
     printf("triplet avg. ops/sec: %e Gops/sec\n\n", triplet_ops(n, seq_block_size)*10e-9/(naive_time/ntrials));
     printf("gemm ops: %e Gflops\n\n", 10e-9*n*n*n);
+    // printf("gemm avg. Gflops/sec: %e\n", (10e-9*n*n*n));
 
     _mm_free(D);
     _mm_free(C1);
