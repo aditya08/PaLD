@@ -6370,8 +6370,9 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, 
 
     conflict_loop_time = omp_get_wtime() - time_start;
     time_start = omp_get_wtime();
+    int* ntasks = calloc(nthreads, sizeof(int));
     // block_size /= 2;
-    #pragma omp parallel shared(C, D, conflict_matrix, n) num_threads(nthreads)
+    #pragma omp parallel shared(C, D, ntasks, conflict_matrix, n) num_threads(nthreads)
     {
         unsigned int iters = 0;
         double time_start = 0.0, time_start2 = 0.0;
@@ -6390,7 +6391,6 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, 
             }
             C[i + i * n] = sum;
         }
-
         float scalar_xy_closest, scalar_xz_closest, scalar_yz_closest;
         #pragma omp single
         for(xb = 0; xb < n; xb += block_size){
@@ -6399,7 +6399,7 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, 
                 y_block = ((yb + block_size) < n) ? block_size : (n - yb);
                 for(zb = yb; zb < n; zb += block_size){
                     z_block = ((zb + block_size) < n) ? block_size : (n - zb);
-                    #pragma omp task \
+                    #pragma omp task\
                     depend(inout: C[yb + xb * n]) \
                     depend(inout: C[xb + yb * n]) \
                     depend(inout: C[zb + xb * n]) \
@@ -6407,7 +6407,10 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, 
                     depend(inout: C[zb + yb * n]) \
                     depend(inout: C[yb + zb * n])
                     {
-                        // printf("tid: %d, (xb: %d, yb:%d, zb:%d)\n", omp_get_thread_num(), xb/block_size, yb/block_size, zb/block_size);
+                        // if(omp_get_thread_num() == 0){
+                        //     printf("tid: %d, (xb: %d, yb:%d, zb:%d)\n", omp_get_thread_num(), xb/block_size, yb/block_size, zb/block_size);
+                        // }
+                        // ntasks[omp_get_thread_num()]++;
                         unsigned int x, y, z, idx, zstart, ystart, xend, loop_len;
                         unsigned int distance_check_1_mask, distance_check_2_mask;
                         float dist_xy = 0.f, conflict_xy_val = 0.f;
@@ -6576,7 +6579,9 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int block_size, 
                 }
             }
         }
+        // printf("tid: %d, ntasks: %d\n", omp_get_thread_num(), ntasks[omp_get_thread_num()]);
     }
+
     // print_matrix(n, n, C);
     _mm_free(conflict_matrix);
     cohesion_loop_time = omp_get_wtime() - time_start;
