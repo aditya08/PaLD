@@ -71,6 +71,10 @@ int main(int argc, char **argv) {
     // fwrite(D, sizeof(float), num_gen, f);
     // fclose(f);
     //computing C with optimal block algorithm
+    for(int i = 0; i < 3; ++i){
+        memset(C1, 0, sizeof(float)*n*n);
+        pald_triplet_intrin(D, 1., n, C1, seq_block_size);
+    }
     double start = 0., naive_time = 0., omp_time = 0.;
     for (int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
@@ -82,6 +86,10 @@ int main(int argc, char **argv) {
         naive_time += omp_get_wtime() - start;
     }
 
+    for(int i = 0; i < 3; ++i){
+        memset(C2, 0, sizeof(float)*n*n);
+        pald_triplet_openmp(D, 1., n, C2, omp_block_size, nthreads);
+    }
     //print_out(n, C1);
     for (int i = 0; i < ntrials; ++i){
         memset(C2, 0, sizeof(float)*n*n);
