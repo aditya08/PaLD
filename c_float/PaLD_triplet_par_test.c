@@ -41,10 +41,10 @@ void print_diag(int n, float *C){
 int main(int argc, char **argv) {
 
     //initializing testing environment spec
-    int n, seq_block_size, i, nthreads, omp_block_size, ntrials;
+    int n, seq_block_size, i, nthreads, omp_block_size, conflict_block_size, cohesion_block_size, ntrials;
 
-    if ((argc != 6) || !(n = atoi(argv[1])) || !(seq_block_size = atoi(argv[2])) || !(omp_block_size = atoi(argv[3])) ||  !(nthreads = atoi(argv[4])) || !(ntrials = atoi(argv[5]))) {
-        fprintf(stderr, "Usage: ./name distance_mat_size sequential_block_size openmp_block_size num_threads num_trials\n");
+    if ((argc != 7) || !(n = atoi(argv[1])) || !(seq_block_size = atoi(argv[2])) || !(conflict_block_size = atoi(argv[3])) ||  !(cohesion_block_size = atoi(argv[4])) || !(nthreads = atoi(argv[5])) || !(ntrials = atoi(argv[6]))) {
+        fprintf(stderr, "Usage: ./name distance_mat_size sequential_block_size conflict_block_size cohesion_block_size num_threads num_trials\n");
         exit(-1);
     }
 
@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
 
     for(int i = 0; i < 3; ++i){
         memset(C2, 0, sizeof(float)*n*n);
-        pald_triplet_openmp(D, 1., n, C2, omp_block_size, nthreads);
+        pald_triplet_openmp(D, 1., n, C2, conflict_block_size, cohesion_block_size, nthreads);
     }
     //print_out(n, C1);
     for (int i = 0; i < ntrials; ++i){
@@ -96,7 +96,7 @@ int main(int argc, char **argv) {
         start = omp_get_wtime();
         // pald_triplet_blocked(D, 1, n, C2, nthreads);
         //pald_triplet_naive(D, 1, n, C2);
-        pald_triplet_openmp(D, 1., n, C2, omp_block_size, nthreads);
+        pald_triplet_openmp(D, 1., n, C2, conflict_block_size, cohesion_block_size, nthreads);
         //pald_triplet_naive_openmp(D, 1, n, C2, nthreads);
         omp_time += omp_get_wtime() - start;
     }

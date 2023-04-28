@@ -48,15 +48,6 @@ int main(int argc, char **argv) {
     float *D = _mm_malloc(sizeof(float) * num_gen, VECALIGN);
     dist_mat_gen2D(D, n, 1, 10*n, 12345, '2');
 
-
-    float *C = _mm_malloc(num_gen*sizeof(float), VECALIGN);
-    memset(C, 0, sizeof(float)*num_gen);
-    float *A = _mm_malloc(sizeof(float) * num_gen, VECALIGN);
-    float *B = _mm_malloc(sizeof(float) * num_gen, VECALIGN);
-    sgemm_rand(A, num_gen, -1.f, 1.f, 42);
-    sgemm_rand(B, num_gen, -1.f, 1.f, 42);
-
-
     // FILE *f = fopen("dist_mat.bin", "wb");
     // fwrite(D, sizeof(float), num_gen, f);
     // fclose(f);
@@ -67,7 +58,10 @@ int main(int argc, char **argv) {
         start = omp_get_wtime();
         // pald_triplet_L2_blocked(D, 1, n, C1, triplet_L1_cache_size,triplet_L2_cache_size);
         // pald_triplet(D, 1., n, C1, triplet_L1_cache_size);
-        pald_triplet_intrin(D, 1, n, C1, allz_cache_size);
+        pald_allz(D, 1.0, n, C1, allz_cache_size);
+        // pald_allz_openmp(D, 1.0, n, C1, allz_cache_size, 8);
+        // pald_triplet_intrin(D, 1, n, C1, allz_cache_size);
+        // pald_allz_naive(D, 1.0, n, C1);
         // pald_triplet_naive(D, 1., n, C1);
         naive_time += omp_get_wtime() - start;
     }
@@ -76,9 +70,11 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; ++i){
         memset(C2, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
+        // pald_allz_openmp_noties_nobeta_vecbranching(D, 1.0, n, C2, allz_cache_size, 16);
         // pald_triplet_fewercompares(D, 1, n, C2, triplet_L1_cache_size);
         // pald_triplet(D, 1, n, C2, triplet_L1_cache_size);
-        pald_triplet_L2_blocked(D, 1, n, C2, triplet_L1_cache_size, triplet_L2_cache_size);
+        pald_triplet_intrin(D, 1, n, C2, allz_cache_size);
+        // pald_triplet_L2_blocked(D, 1, n, C2, triplet_L1_cache_size, triplet_L2_cache_size);
         // pald_triplet_intrin_powersoftwo(D, 1., n, C2, triplet_L1_cache_size);
         // pald_triplet_largezblock(D, 1., n, C2, triplet_L1_cache_size, triplet_L2_cache_size);
         opt_time += omp_get_wtime() - start;
@@ -86,6 +82,27 @@ int main(int argc, char **argv) {
     //print out triplet algorithms result
     // print_out(n,C2);
     // print_out(n, C1);
+
+    // compute max norm error between two cohesion matrices
+    float d, maxdiff = 0.;
+    for (i = 0; i < num_gen; i++) {
+        d = fabs(C1[i]-C2[i]);
+        maxdiff = d > maxdiff ? d : maxdiff;
+    }
+
+    _mm_free(D);
+    _mm_free(C2);
+    _mm_free(C1);
+
+
+    float *C = _mm_malloc(num_gen*sizeof(float), VECALIGN);
+    memset(C, 0, sizeof(float)*num_gen);
+    float *A = _mm_malloc(sizeof(float) * num_gen, VECALIGN);
+    float *B = _mm_malloc(sizeof(float) * num_gen, VECALIGN);
+    sgemm_rand(A, num_gen, -1.f, 1.f, 42);
+    sgemm_rand(B, num_gen, -1.f, 1.f, 42);
+
+
     double sgemm_time = 0.;
     for(int i = 0; i < ntrials; ++i){
         memset(C, 0, sizeof(float)*num_gen);
@@ -108,13 +125,7 @@ int main(int argc, char **argv) {
     //print_out(n, C);
     // print out for error checking
 
-    // compute max norm error between two cohesion matrices
 
-    float d, maxdiff = 0.;
-    for (i = 0; i < num_gen; i++) {
-        d = fabs(C1[i]-C2[i]);
-        maxdiff = d > maxdiff ? d : maxdiff;
-    }
     printf("=============================================\n");
     printf("           Summary, n: %d\n", n);
     printf("=============================================\n");
@@ -128,9 +139,6 @@ int main(int argc, char **argv) {
 
     printf("SGEMM time: %.5fs\n", sgemm_time/ntrials);
     printf("SGEMM Speedup: %.2f\n", naive_time/sgemm_time);
-    _mm_free(D);
-    _mm_free(C2);
-    _mm_free(C1);
     //free sgemm matrices.
     _mm_free(A);
     _mm_free(B);

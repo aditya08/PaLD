@@ -41,10 +41,10 @@ void print_diag(int n, float *C){
 int main(int argc, char **argv) {
 
     //initializing testing environment spec
-    unsigned int n, seq_block_size, i, nthreads, ntrials;
+    unsigned int n, i, nthreads, omp_block_size,  ntrials;
 
-    if ((argc != 4) || !(n = atoi(argv[1])) || !(seq_block_size = atoi(argv[2])) || !(ntrials = atoi(argv[3]))) {
-        fprintf(stderr, "Usage: ./name distance_mat_size sequential_block_size num_trials\n");
+    if ((argc != 5) || !(n = atoi(argv[1])) || !(omp_block_size = atoi(argv[2])) || !(nthreads = atoi(argv[3])) || !(ntrials = atoi(argv[4]))) {
+        fprintf(stderr, "Usage: ./name distance_mat_size omp_block_size num_threads num_trials\n");
         exit(-1);
     }
 
@@ -69,20 +69,27 @@ int main(int argc, char **argv) {
     // fwrite(D, sizeof(float), num_gen, f);
     // fclose(f);
     //computing C with optimal block algorithm
-    // for (unsigned int i = 0; i < 3; ++i){
-    //     memset(C1, 0, sizeof(float)*n*n);
-    //     // start = omp_get_wtime();
-    //     pald_triplet_intrin(D, 1., n, C1, seq_block_size);
-    //     // pald_triplet_largezblock(D, 1., n, C1, seq_block_size, 1024);
-    //     // naive_time += omp_get_wtime() - start;
-    // }
-    double start = 0., naive_time = 0.;
-    for (unsigned int i = 0; i < ntrials; ++i){
+    double start = 0., omp_time = 0.;
+    //print_out(n, C1);
+
+    for (int i = 0; i < 3; ++i){
+        memset(C1, 0, sizeof(float)*n*n);
+        // start = omp_get_wtime();
+        // pald_triplet_blocked(D, 1, n, C2, nthreads);
+        //pald_triplet_naive(D, 1, n, C2);
+        pald_allz_openmp_noties_nobeta_vecbranching(D, 1.0, n, C1, omp_block_size, nthreads);
+        //pald_triplet_naive_openmp(D, 1, n, C2, nthreads);
+        // omp_time += omp_get_wtime() - start;
+    }
+
+    for (int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet_intrin(D, 1., n, C1, seq_block_size);
-        // pald_triplet_largezblock(D, 1., n, C1, seq_block_size, 1024);
-        naive_time += omp_get_wtime() - start;
+        // pald_triplet_blocked(D, 1, n, C2, nthreads);
+        //pald_triplet_naive(D, 1, n, C2);
+        pald_allz_openmp_noties_nobeta_vecbranching(D, 1.0, n, C1, omp_block_size, nthreads);
+        //pald_triplet_naive_openmp(D, 1, n, C2, nthreads);
+        omp_time += omp_get_wtime() - start;
     }
 
 
@@ -106,15 +113,13 @@ int main(int argc, char **argv) {
     //print_out(n, C);
     // print out for error checking
 
+    // compute max norm error between two cohesion matrices
+    // printf("Maximum difference: %1.1e \n", maxdiff);
+
     printf("=============================================\n");
     printf("           Summary, n: %d\n", n);
     printf("=============================================\n");
-    printf("Avg. Sequential time: %.5fs\n",naive_time/ntrials);
-
-    printf("triplet ops: %e Gops\n\n", triplet_ops(n, seq_block_size)*10e-9);
-    printf("triplet avg. ops/sec: %e Gops/sec\n\n", triplet_ops(n, seq_block_size)*10e-9/(naive_time/ntrials));
-    printf("gemm ops: %e Gflops\n\n", 10e-9*n*n*n);
-    // printf("gemm avg. Gflops/sec: %e\n", (10e-9*n*n*n));
+    printf("Avg. Parallel time: %.5fs, nthreads: %d\n", omp_time/ntrials, nthreads);
 
     _mm_free(D);
     _mm_free(C1);
