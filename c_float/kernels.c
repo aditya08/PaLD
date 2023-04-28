@@ -7286,9 +7286,8 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int conflict_blo
 
     conflict_loop_time = omp_get_wtime() - time_start;
     time_start = omp_get_wtime();
-    int* ntasks = calloc(nthreads, sizeof(int));
     block_size = cohesion_block_size;
-    #pragma omp parallel shared(C, D, ntasks, conflict_matrix, n) num_threads(nthreads)
+    #pragma omp parallel shared(C, D, conflict_matrix, n) num_threads(nthreads)
     {
         unsigned int iters = 0;
         double time_start = 0.0, time_start2 = 0.0;
@@ -7326,11 +7325,15 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int conflict_blo
                     private(i, j, x, y, z, idx, loop_len, dist_xy, xend, ystart, zstart) \
                     private(scalar_xy_closest, scalar_xz_closest, scalar_yz_closest) \
                     private(distance_check_1_mask, distance_check_2_mask, xy_reduction) \
+                    private(yx_reduction, conflict_xy_val) \
                     firstprivate(xb, yb, zb, x_block, y_block, z_block) \
-                    shared(block_size, D, n, conflict_matrix) \
+                    shared(block_size, D, C, n, conflict_matrix) \
                     depend(inout: C[yb + xb * n]) \
                     depend(inout: C[zb + xb * n]) \
-                    depend(inout: C[zb + yb * n])
+                    depend(inout: C[zb + yb * n]) \
+                    depend(inout: C[xb + yb * n]) \
+                    depend(inout: C[xb + zb * n]) \
+                    depend(inout: C[yb + zb * n])
                     {
                         // if(omp_get_thread_num() == 0){
                         //     printf("tid: %d, (xb: %d, yb:%d, zb:%d)\n", omp_get_thread_num(), xb/block_size, yb/block_size, zb/block_size);
