@@ -7095,11 +7095,8 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int conflict_blo
                         // Copy DXY, DXZ, DYZ blocks.
                         for(i = 0; i < x_block; ++i){
                             memcpy(distance_xy_block + i * block_size, D + yb + (xb + i) * n, sizeof(float) * y_block);
-                        }
-                        for(i = 0; i < x_block; ++i){
                             memcpy(distance_xz_block + i * block_size, D + zb + (xb + i) * n, sizeof(float) * z_block);
                         }
-
                         for(i = 0; i < y_block; ++i){
                             memcpy(distance_yz_block + i * block_size, D + zb + (yb + i) * n, sizeof(float) * z_block);
                         }
@@ -7358,12 +7355,11 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int conflict_blo
                         for(i = 0; i < x_block; ++i){
                             memcpy(distance_xy_block + i * block_size, D + yb + (xb + i) * n, sizeof(float) * y_block);
                             memcpy(conflict_xy_block + i * block_size, conflict_matrix + yb + (xb + i) * n, sizeof(float) * y_block);
-                        }
-                        // Set conflict blocks: UXY, UXZ, UYZ.
-                        for(i = 0; i < x_block; ++i){
                             memcpy(conflict_xz_block + i * block_size, conflict_matrix + zb + (xb + i) * n, sizeof(float) * z_block);
                             memcpy(distance_xz_block + i * block_size, D + zb + (xb + i) * n, sizeof(float) * z_block);
+
                         }
+                        // Set conflict blocks: UXY, UXZ, UYZ.
                         for(i = 0; i < y_block; ++i){
                             memcpy(distance_yz_block + i * block_size, D + zb + (yb + i) * n, sizeof(float) * z_block);
                             memcpy(conflict_yz_block + i * block_size, conflict_matrix + zb + (yb + i) * n, sizeof(float) * z_block);
