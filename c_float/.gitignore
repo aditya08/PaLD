@@ -7,6 +7,9 @@ PaLD_triplet_l2blocking_test
 PaLD_vtune
 PaLD_triplet_omp_benchmark
 PaLD_triplet_benchmark
+PaLD_allz_benchmark
+PaLD_allz_omp_benchmark
+PaLD_allz_par_test
 *.err
 *.o
 *.optrpt
