@@ -24,17 +24,18 @@ void print_out(int n, float *C) {
 int main(int argc, char **argv) {
 
     //initializing testing environment spec
-    int n, l1_block_size, l2_block_size, nthreads, ntrials, i;
-    
-    if (argc != 6) {
-        fprintf(stderr, "Usage: ./name distance_mat_size L1_block_size L2_block_size num_threads ntrials\n");
+    int n, conflict_block_size, cohesion_block_size, l2_block_size, nthreads, ntrials, i;
+
+    if (argc != 7) {
+        fprintf(stderr, "Usage: ./name distance_mat_size conflict_block_size cohesion_block_size L2_block_size num_threads ntrials\n");
         exit(-1);
     }
     n = atoi(argv[1]);
-    l1_block_size = atoi(argv[2]);
-    l2_block_size = atoi(argv[3]);
-    nthreads = atoi(argv[4]);
-    ntrials = atoi(argv[5]); 
+    conflict_block_size = atoi(argv[2]);
+    cohesion_block_size = atoi(argv[3]);
+    l2_block_size = atoi(argv[4]);
+    nthreads = atoi(argv[5]);
+    ntrials = atoi(argv[6]);
     unsigned int num_gen = n * n;
 
     float *C1 = (float *) _mm_malloc(num_gen*sizeof(float),VECALIGN);//calloc(num_gen, sizeof(float));
@@ -62,19 +63,19 @@ int main(int argc, char **argv) {
         memset(C1, 0, num_gen*sizeof(float));
         start = omp_get_wtime();
         // pald_triplet_L2_blocked(D, 1, n, C1, l1_block_size,l2_block_size);
-        pald_triplet_intrin(D, 1.f, n, C1, l1_block_size);
+        pald_triplet_intrin(D, 1.f, n, C1, conflict_block_size, cohesion_block_size);
         // pald_triplet_intrin_openmp(D, 1.f, n, C1, l1_block_size);
         // pald_allz_experimental(D, 1, n, C1, l1_block_size);
         elapsed += omp_get_wtime() - start;
 
     }
-    
+
     //print out block algorithm result
     //print_out(n, C);
 
 
-    //computing C with original algorithm  
-    /*   
+    //computing C with original algorithm
+    /*
     start = clock();
     //for (int i = 0; i < 4; ++i)
     pald_orig(D, 1, n, C2);
@@ -96,7 +97,7 @@ int main(int argc, char **argv) {
     printf("Maximum difference: %1.1e \n", maxdiff);
     */
     printf("%d Opt time: %.3fs\n", n, elapsed/ntrials);
-   
+
     _mm_free(D);
     //free(C2);
     _mm_free(C1);

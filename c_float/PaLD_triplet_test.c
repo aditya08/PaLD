@@ -29,10 +29,10 @@ void print_out(int n, float *C) {
 int main(int argc, char **argv) {
 
     //initializing testing environment spec
-    int n, triplet_L2_cache_size, triplet_L1_cache_size, allz_cache_size, i;
+    int n, triplet_L2_cache_size, conflict_block_size, cohesion_block_size, allz_cache_size, i;
     int ntrials;
-    if ((argc < 6) || !(n = atoi(argv[1])) || !(triplet_L1_cache_size = atoi(argv[2])) || !(triplet_L2_cache_size = atoi(argv[3])) || !(allz_cache_size = atoi(argv[4])) || !(ntrials = atoi(argv[5]))) {
-        fprintf(stderr, "Usage: ./name distance_mat_size triplet_L1_block_size triplet_L2_block_size allz_block_size ntrials\n");
+    if ((argc < 7) || !(n = atoi(argv[1])) || !(conflict_block_size = atoi(argv[2])) || !(cohesion_block_size = atoi(argv[3])) || !(triplet_L2_cache_size = atoi(argv[4])) || !(allz_cache_size = atoi(argv[5])) || !(ntrials = atoi(argv[6]))) {
+        fprintf(stderr, "Usage: ./name distance_mat_size conflict_block_size cohesion_block_size triplet_L2_block_size allz_block_size ntrials\n");
         exit(-1);
     }
 
@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
         // pald_allz_openmp_noties_nobeta_vecbranching(D, 1.0, n, C2, allz_cache_size, 16);
         // pald_triplet_fewercompares(D, 1, n, C2, triplet_L1_cache_size);
         // pald_triplet(D, 1, n, C2, triplet_L1_cache_size);
-        pald_triplet_intrin(D, 1, n, C2, allz_cache_size);
+        pald_triplet_intrin(D, 1, n, C2, conflict_block_size, cohesion_block_size);
         // pald_triplet_L2_blocked(D, 1, n, C2, triplet_L1_cache_size, triplet_L2_cache_size);
         // pald_triplet_intrin_powersoftwo(D, 1., n, C2, triplet_L1_cache_size);
         // pald_triplet_largezblock(D, 1., n, C2, triplet_L1_cache_size, triplet_L2_cache_size);

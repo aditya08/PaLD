@@ -29,15 +29,15 @@ void print_out(int n, float *C) {
 int main(int argc, char **argv) {
 
     //initializing testing environment spec
-    int n, l2_cache_size, l1_cache_size, ntrials, i;
+    int n, l1_block_size, l2_block_size, conflict_block_size, cohesion_block_size, ntrials, i;
 
-    if ((argc < 5) || !(n = atoi(argv[1])) || !(l1_cache_size = atoi(argv[2])) || !(l2_cache_size = atoi(argv[3])) || !(ntrials = atoi(argv[4]))) {
-        fprintf(stderr, "Usage: ./name distance_mat_size l1_block_size l2_block_size ntrials\n");
+    if ((argc < 7) || !(n = atoi(argv[1])) || !(conflict_block_size = atoi(argv[2])) || !(cohesion_block_size = atoi(argv[3])) || !(l1_block_size = atoi(argv[4])) || !(l2_block_size = atoi(argv[5])) || !(ntrials = atoi(argv[6]))) {
+        fprintf(stderr, "Usage: ./name distance_mat_size conflict_block_size cohesion_block_size l1_block_size l2_block_size ntrials\n");
         exit(-1);
     }
 
-    // cache_size = argc > 2 ? 2 : atoi(argv[2]);
-    // cache_size = argc == 2 ? 2 : atoi(argv[2]);
+    // block_size = argc > 2 ? 2 : atoi(argv[2]);
+    // block_size = argc == 2 ? 2 : atoi(argv[2]);
 
     unsigned int num_gen = n * n;
     float *C1 = _mm_malloc(num_gen*sizeof(float), VECALIGN);
@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet_intrin(D, 1, n, C1, l1_cache_size);
+        pald_triplet_intrin(D, 1, n, C1, conflict_block_size, cohesion_block_size);
         naive_time += omp_get_wtime() - start;
     }
 
@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; ++i){
         memset(C2, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet_L2_blocked(D, 1, n, C2, l1_cache_size, l2_cache_size);
+        pald_triplet_L2_blocked(D, 1, n, C2, l1_block_size, l2_block_size);
         opt_time += omp_get_wtime() - start;
     }
     float d, maxdiff = 0.;
