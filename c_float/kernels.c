@@ -2,7 +2,7 @@
 #include "mkl.h"
 #include "immintrin.h"
 #include "limits.h"
-//#include <advisor-annotate.h>
+#include <advisor-annotate.h>
 
 void print_matrix(int size, int stride, float *C) {
     printf("[\n");
@@ -3327,8 +3327,9 @@ void pald_triplet_intrin_powersoftwo(float *D, float beta, int n, float *C, int 
 
 }
 
-void pald_triplet_intrin(float *D, float beta, unsigned int n, float *C, unsigned int block_size){
+void pald_triplet_intrin(float *D, float beta, int n, float *C, int conflict_block_size, int cohesion_block_size){
     //TODO: Optimized sequential triplet code.
+    int block_size = conflict_block_size;
     float* restrict conflict_matrix = (float *)  _mm_malloc(n * n * sizeof(float), VECALIGN);
     // memset(conflict_matrix, 0, n * n * sizeof(float));
     unsigned int* restrict conflict_matrix_int = (unsigned int*)  _mm_malloc(n * n * sizeof(unsigned int), VECALIGN);
@@ -3372,7 +3373,6 @@ void pald_triplet_intrin(float *D, float beta, unsigned int n, float *C, unsigne
     unsigned int x_block, y_block, z_block;
     // int size_xy = block_size, size_xz = block_size, size_yz = block_size;
     unsigned int xend, ystart, zstart;
-    float xy_reduction = 0.f, yx_reduction = 0.f, cohesion_sum = 0.f;
     // compute conflict focus sizes.
     unsigned int iters = 0;
     unsigned int idx;
@@ -3389,6 +3389,7 @@ void pald_triplet_intrin(float *D, float beta, unsigned int n, float *C, unsigne
 
 
     //TODO: Add another level of blocking.
+    ANNOTATE_SITE_BEGIN(conflictfocus);
     for(xb = 0; xb < n; xb += block_size){
         x_block = ((xb + block_size) < n) ? block_size : (n - xb);
         for(yb = xb; yb < n; yb += block_size){
@@ -3404,6 +3405,7 @@ void pald_triplet_intrin(float *D, float beta, unsigned int n, float *C, unsigne
 
             // copy DXY block from D.
             for(zb = yb; zb < n; zb += block_size){
+                ANNOTATE_TASK_BEGIN(conflictfocustask);
                 z_block = ((zb + block_size) < n) ? block_size : (n - zb);
                 //copy DXZ and DYZ blocks from D.
                 time_start = omp_get_wtime();
@@ -3535,7 +3537,8 @@ void pald_triplet_intrin(float *D, float beta, unsigned int n, float *C, unsigne
                             loop_len = z_block - zstart;
                             if(yb == zb){
                                 idx = y + 1;
-                                #pragma unroll(16)
+                                #pragma vector novecremainder
+                                #pragma nounroll
                                 for (z = 0; z < loop_len; ++z){
                                     //compute masks for conflict blocks.
 
@@ -3614,6 +3617,7 @@ void pald_triplet_intrin(float *D, float beta, unsigned int n, float *C, unsigne
 
                 }
                 memops_loop_time += omp_get_wtime() - time_start2;
+                ANNOTATE_TASK_END();
                 // printf("(xb: %d, yb: %d, zb: %d)\n", xb, yb, zb);
                 // print_matrix_int(block_size, block_size, buffer_conflict_yz_block_int);
                 // printf("[\n");
@@ -3645,6 +3649,7 @@ void pald_triplet_intrin(float *D, float beta, unsigned int n, float *C, unsigne
     }
     // print_matrix_int(n, n, conflict_matrix_int);
     // return;
+    ANNOTATE_SITE_END();
     time_start = omp_get_wtime();
     for(i = 0; i < n * n; ++i){
         // conflict_matrix[i] = 1.f/conflict_matrix[i];
@@ -3682,13 +3687,14 @@ void pald_triplet_intrin(float *D, float beta, unsigned int n, float *C, unsigne
     float *cohesion_zx_block;
     float *cohesion_yz_block;
     float *cohesion_zy_block;
-    block_size/=2;
+    block_size = cohesion_block_size;
 
     // float* restrict mask_xy_closest = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
     // float* restrict mask_xz_closest = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
     // float* restrict mask_yz_closest = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
 
     float scalar_xy_closest, scalar_xz_closest, scalar_yz_closest;
+    float xy_reduction = 0.f, yx_reduction = 0.f, cohesion_sum = 0.f;
 
     // float* restrict mask_tie_xy_xz = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
     // float* restrict mask_tie_xy_yz = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
@@ -3715,6 +3721,7 @@ void pald_triplet_intrin(float *D, float beta, unsigned int n, float *C, unsigne
     float* tmp_buffer_zy_block = buffer_zy_block;
     memops_loop_time += omp_get_wtime() - time_start;
 
+    ANNOTATE_SITE_BEGIN(cohesion);
     for(xb = 0; xb < n; xb += block_size){
         x_block = ((xb + block_size) < n) ? block_size : (n - xb);
         for(yb = xb; yb < n; yb += block_size){
@@ -3728,39 +3735,40 @@ void pald_triplet_intrin(float *D, float beta, unsigned int n, float *C, unsigne
             memset(buffer_xy_block,0,sizeof(float)*block_size*block_size);
             memops_loop_time += omp_get_wtime() - time_start;
             for(zb = yb; zb < n; zb += block_size){
+                ANNOTATE_TASK_BEGIN(cohesiontask);
                 z_block = ((zb + block_size) < n) ? block_size : (n - zb);
                 time_start = omp_get_wtime();
                 conflict_xz_block = conflict_matrix + zb + xb * n;
                 conflict_yz_block = conflict_matrix + zb + yb * n;
-                if(xb == yb){
-                    #pragma unroll(8)
-                    for (i = 0; i < x_block; ++i){
-                        memcpy(distance_xz_block + i * block_size, D + zb + (xb + i) * n, sizeof(float)*z_block);
-                        memcpy(buffer_conflict_xz_block + i * block_size, conflict_xz_block + i * n, sizeof(float)*z_block);
-                        // memcpy(distance_yz_block + i * block_size, D + zb + (yb + i) * n, sizeof(float)*block_size);
-                        // memcpy(buffer_conflict_yz_block + i * block_size, conflict_yz_block + i * n, sizeof(float)*block_size);
-                    }
-                    distance_yz_block = distance_xz_block;
-                    buffer_conflict_yz_block = buffer_conflict_xz_block;
-                    memset(buffer_zx_block,0,sizeof(float)*block_size*block_size);
-                    memset(buffer_xz_block,0,sizeof(float)*block_size*block_size);
+                // if(xb == yb){
+                //     #pragma unroll(8)
+                //     for (i = 0; i < x_block; ++i){
+                //         memcpy(distance_xz_block + i * block_size, D + zb + (xb + i) * n, sizeof(float)*z_block);
+                //         memcpy(buffer_conflict_xz_block + i * block_size, conflict_xz_block + i * n, sizeof(float)*z_block);
+                //         // memcpy(distance_yz_block + i * block_size, D + zb + (yb + i) * n, sizeof(float)*block_size);
+                //         // memcpy(buffer_conflict_yz_block + i * block_size, conflict_yz_block + i * n, sizeof(float)*block_size);
+                //     }
+                //     distance_yz_block = distance_xz_block;
+                //     buffer_conflict_yz_block = buffer_conflict_xz_block;
+                //     memset(buffer_zx_block,0,sizeof(float)*block_size*block_size);
+                //     memset(buffer_xz_block,0,sizeof(float)*block_size*block_size);
 
-                    buffer_zy_block = buffer_zx_block;
-                    buffer_yz_block = buffer_xz_block;
-                }
-                else{
-                    distance_yz_block = tmp_distance_yz_block;
-                    buffer_conflict_yz_block = tmp_buffer_conflict_yz_block;
-                    buffer_zy_block = tmp_buffer_zy_block;
-                    buffer_yz_block = tmp_buffer_yz_block;
-                    #pragma unroll(8)
+                //     buffer_zy_block = buffer_zx_block;
+                //     buffer_yz_block = buffer_xz_block;
+                // }
+                // else{
+                    // distance_yz_block = tmp_distance_yz_block;
+                    // buffer_conflict_yz_block = tmp_buffer_conflict_yz_block;
+                    // buffer_zy_block = tmp_buffer_zy_block;
+                    // buffer_yz_block = tmp_buffer_yz_block;
+                    // #pragma unroll(8)
                     for (i = 0; i < x_block; ++i){
                         memcpy(distance_xz_block + i * block_size, D + zb + (xb + i) * n, sizeof(float)*z_block);
                         memcpy(buffer_conflict_xz_block + i * block_size, conflict_xz_block + i * n, sizeof(float)*z_block);
                         // memcpy(distance_yz_block + i * block_size, D + zb + (yb + i) * n, sizeof(float)*block_size);
                         // memcpy(buffer_conflict_yz_block + i * block_size, conflict_yz_block + i * n, sizeof(float)*block_size);
                     }
-                    #pragma unroll(8)
+                    // #pragma unroll(8)
                     for (i = 0; i < y_block; ++i){
                         // memcpy(distance_xz_block + i * block_size, D + zb + (xb + i) * n, sizeof(float)*block_size);
                         // memcpy(buffer_conflict_xz_block + i * block_size, conflict_xz_block + i * n, sizeof(float)*block_size);
@@ -3772,7 +3780,7 @@ void pald_triplet_intrin(float *D, float beta, unsigned int n, float *C, unsigne
                     memset(buffer_zy_block,0,sizeof(float)*block_size*block_size);
                     memset(buffer_xz_block,0,sizeof(float)*block_size*block_size);
                     memset(buffer_yz_block,0,sizeof(float)*block_size*block_size);
-                }
+                // }
                 memops_loop_time += omp_get_wtime() - time_start;
 
                 time_start = omp_get_wtime();
@@ -4022,27 +4030,27 @@ void pald_triplet_intrin(float *D, float beta, unsigned int n, float *C, unsigne
                 }
                 cohesion_loop_time += omp_get_wtime() - time_start;
                 time_start2 = omp_get_wtime();
-                if(xb == yb){
-                    cohesion_zx_block = C + xb + zb * n;
-                    cohesion_xz_block = C + zb + xb * n;
-                    for(i = 0; i < z_block; ++i){
-                        for(j = 0; j < x_block; ++j){
-                            // printf("idx: %d\n", n*j + i);
-                            cohesion_zx_block[j] += buffer_zx_block[i + j * block_size];
-                            // cohesion_yx_block[j] += buffer_yx_block[i + j * block_size];
-                        }
-                        cohesion_zx_block += n;
-                    }
-                    for(i = 0; i < x_block; ++i){
-                        for(j = 0; j < z_block; ++j){
-                            cohesion_xz_block[j] += buffer_xz_block[j + i * block_size];
-                            // cohesion_xy_block[j] += buffer_xy_block[j + i * block_size];
-                        }
-                        cohesion_xz_block += n;
-                    }
+                // if(xb == yb){
+                //     cohesion_zx_block = C + xb + zb * n;
+                //     cohesion_xz_block = C + zb + xb * n;
+                //     for(i = 0; i < z_block; ++i){
+                //         for(j = 0; j < x_block; ++j){
+                //             // printf("idx: %d\n", n*j + i);
+                //             cohesion_zx_block[j] += buffer_zx_block[i + j * block_size];
+                //             // cohesion_yx_block[j] += buffer_yx_block[i + j * block_size];
+                //         }
+                //         cohesion_zx_block += n;
+                //     }
+                //     for(i = 0; i < x_block; ++i){
+                //         for(j = 0; j < z_block; ++j){
+                //             cohesion_xz_block[j] += buffer_xz_block[j + i * block_size];
+                //             // cohesion_xy_block[j] += buffer_xy_block[j + i * block_size];
+                //         }
+                //         cohesion_xz_block += n;
+                //     }
 
-                }
-                else{
+                // }
+                // else{
                     cohesion_zx_block = C + xb + zb * n;
                     cohesion_zy_block = C + yb + zb * n;
                     cohesion_xz_block = C + zb + xb * n;
@@ -4085,9 +4093,11 @@ void pald_triplet_intrin(float *D, float beta, unsigned int n, float *C, unsigne
                         // cohesion_xz_block += n;
                         cohesion_yz_block += n;
                     }
-                }
+                // }
 
                 memops_loop_time += omp_get_wtime() - time_start2;
+                ANNOTATE_TASK_END();
+
             }
             time_start2 = omp_get_wtime();
             cohesion_xy_block = C + yb + xb * n;
@@ -4109,6 +4119,7 @@ void pald_triplet_intrin(float *D, float beta, unsigned int n, float *C, unsigne
             memops_loop_time += omp_get_wtime() - time_start2;
         }
     }
+    ANNOTATE_SITE_END();
     // print_matrix(n, n, C);
 
     printf("==============================================\n");
@@ -6012,6 +6023,7 @@ void pald_triplet(float* restrict D, float beta, int n, float* restrict C, int b
 void pald_triplet_L2_blocked(float* restrict D, const float beta, const int n, float* restrict C, int block_size, int l2_block_size){
    //TODO: Optimized sequential triplet code.
     unsigned int* restrict conflict_matrix_int = (unsigned int *)  _mm_malloc(n * n * sizeof(int), VECALIGN);
+    float* restrict conflict_matrix = (float *)  _mm_malloc(n * n * sizeof(float), VECALIGN);
     memset(conflict_matrix_int, 0, n * n * sizeof(int));
     float* restrict distance_xy_block = (float *) _mm_malloc(block_size * block_size * sizeof(int), VECALIGN);
     float* restrict distance_xz_block = (float *) _mm_malloc(block_size * block_size * sizeof(int), VECALIGN);
@@ -6231,7 +6243,6 @@ void pald_triplet_L2_blocked(float* restrict D, const float beta, const int n, f
         }
     }
 
-    float* restrict conflict_matrix = (float *)  _mm_malloc(n * n * sizeof(float), VECALIGN);
     memset(conflict_matrix, 0, n * n * sizeof(float));
     // print_matrix_int(n, n, conflict_matrix_int);
     time_start = omp_get_wtime();
@@ -7074,7 +7085,7 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int conflict_blo
                 for(zb = yb; zb < n; zb += block_size){
                     z_block = ((zb + block_size) < n) ? block_size : (n - zb);
                     // Set DXZ and DYZ blocks.
-                    #pragma omp task default(none)\
+                    #pragma omp task untied default(none)\
                     private(i, j, x, y, z, idx, loop_len, dist_xy, xend, ystart, zstart) \
                     private(scalar_xy_closest_int, scalar_xz_closest_int, scalar_yz_closest_int) \
                     private(distance_check_1_mask, distance_check_2_mask, xy_reduction_int) \
@@ -7286,7 +7297,7 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int conflict_blo
     block_size = cohesion_block_size;
     #pragma omp parallel shared(C, D, conflict_matrix, n) num_threads(nthreads)
     {
-        unsigned int iters = 0;
+        // unsigned int iters = 0;
         double time_start = 0.0, time_start2 = 0.0;
         unsigned int xb, yb, zb;
         unsigned int x_block, y_block, z_block;
@@ -7295,7 +7306,7 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int conflict_blo
         unsigned int x, y, z, idx, zstart, ystart, xend, loop_len;
         unsigned int distance_check_1_mask, distance_check_2_mask;
         float dist_xy = 0.f, conflict_xy_val = 0.f;
-        float xy_reduction = 0.f, yx_reduction = 0.f, cohesion_sum = 0.f;
+        float xy_reduction = 0.f, yx_reduction = 0.f;
         float scalar_xy_closest, scalar_xz_closest, scalar_yz_closest;
 
 
@@ -7318,19 +7329,19 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int conflict_blo
                 y_block = ((yb + block_size) < n) ? block_size : (n - yb);
                 for(zb = yb; zb < n; zb += block_size){
                     z_block = ((zb + block_size) < n) ? block_size : (n - zb);
-                    #pragma omp task default(none)\
+                    #pragma omp task untied default(none)\
                     private(i, j, x, y, z, idx, loop_len, dist_xy, xend, ystart, zstart) \
                     private(scalar_xy_closest, scalar_xz_closest, scalar_yz_closest) \
                     private(distance_check_1_mask, distance_check_2_mask, xy_reduction) \
                     private(yx_reduction, conflict_xy_val) \
                     firstprivate(xb, yb, zb, x_block, y_block, z_block) \
                     shared(block_size, D, C, n, conflict_matrix) \
-                    depend(inout: C[yb + xb * n]) \
-                    depend(inout: C[zb + xb * n]) \
-                    depend(inout: C[zb + yb * n]) \
                     depend(inout: C[xb + yb * n]) \
                     depend(inout: C[xb + zb * n]) \
-                    depend(inout: C[yb + zb * n])
+                    depend(inout: C[yb + zb * n]) \
+                    depend(inout: C[yb + xb * n]) \
+                    depend(inout: C[zb + xb * n]) \
+                    depend(inout: C[zb + yb * n])
                     {
                         // if(omp_get_thread_num() == 0){
                         //     printf("tid: %d, (xb: %d, yb:%d, zb:%d)\n", omp_get_thread_num(), xb/block_size, yb/block_size, zb/block_size);
@@ -7390,6 +7401,7 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int conflict_blo
                                 if(yb == zb){
                                     loop_len = z_block - y - 1;
                                     conflict_xy_val = conflict_xy_block[y + x * block_size];
+                                    #pragma unroll(8)
                                     for (z = 0; z < loop_len; ++z){
                                         //compute masks for conflict blocks.
                                         idx = z + y + 1;
@@ -7423,7 +7435,7 @@ void pald_triplet_openmp(float *D, float beta, int n, float *C, int conflict_blo
                                 else{
                                     conflict_xy_val = conflict_xy_block[y + x * block_size];
                                     //update cohesion blocks.
-                                    // #pragma unroll(8)
+                                    #pragma unroll(8)
                                     for (z = 0; z < z_block; ++z){
                                         // xy closest pair.
                                         distance_check_1_mask = dist_xy < distance_xz_block[z + x * block_size];

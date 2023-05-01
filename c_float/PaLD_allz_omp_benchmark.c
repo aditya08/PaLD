@@ -72,24 +72,24 @@ int main(int argc, char **argv) {
     double start = 0., omp_time = 0.;
     //print_out(n, C1);
 
-    for (int i = 0; i < 3; ++i){
-        memset(C1, 0, sizeof(float)*n*n);
+    for (int i = 0; i < 5; ++i){
         // start = omp_get_wtime();
         // pald_triplet_blocked(D, 1, n, C2, nthreads);
         //pald_triplet_naive(D, 1, n, C2);
         pald_allz_openmp_noties_nobeta_vecbranching(D, 1.0, n, C1, omp_block_size, nthreads);
+        memset(C1, 0, sizeof(float)*n*n);
         //pald_triplet_naive_openmp(D, 1, n, C2, nthreads);
         // omp_time += omp_get_wtime() - start;
     }
 
     for (int i = 0; i < ntrials; ++i){
-        memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
         // pald_triplet_blocked(D, 1, n, C2, nthreads);
         //pald_triplet_naive(D, 1, n, C2);
         pald_allz_openmp_noties_nobeta_vecbranching(D, 1.0, n, C1, omp_block_size, nthreads);
         //pald_triplet_naive_openmp(D, 1, n, C2, nthreads);
         omp_time += omp_get_wtime() - start;
+        memset(C1, 0, sizeof(float)*n*n);
     }
 
 

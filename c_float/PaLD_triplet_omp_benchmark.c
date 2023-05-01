@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
     double start = 0., omp_time = 0.;
     //print_out(n, C1);
 
-    for (int i = 0; i < 3; ++i){
+    for (int i = 0; i < 5; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         // start = omp_get_wtime();
         // pald_triplet_blocked(D, 1, n, C2, nthreads);

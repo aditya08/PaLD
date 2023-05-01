@@ -41,10 +41,10 @@ void print_diag(int n, float *C){
 int main(int argc, char **argv) {
 
     //initializing testing environment spec
-    unsigned int n, seq_block_size, i, nthreads, ntrials;
+    unsigned int n, conflict_block_size, cohesion_block_size, i, nthreads, ntrials;
 
-    if ((argc != 4) || !(n = atoi(argv[1])) || !(seq_block_size = atoi(argv[2])) || !(ntrials = atoi(argv[3]))) {
-        fprintf(stderr, "Usage: ./name distance_mat_size sequential_block_size num_trials\n");
+    if ((argc != 5) || !(n = atoi(argv[1])) || !(conflict_block_size = atoi(argv[2])) || !(cohesion_block_size = atoi(argv[3])) || !(ntrials = atoi(argv[4]))) {
+        fprintf(stderr, "Usage: ./name distance_mat_size conflict_block_size cohesion_block_size num_trials\n");
         exit(-1);
     }
 
@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
     for (unsigned int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet_intrin(D, 1., n, C1, seq_block_size);
+        pald_triplet_intrin(D, 1., n, C1, conflict_block_size, cohesion_block_size);
         // pald_triplet_largezblock(D, 1., n, C1, seq_block_size, 1024);
         naive_time += omp_get_wtime() - start;
     }
@@ -111,9 +111,9 @@ int main(int argc, char **argv) {
     printf("=============================================\n");
     printf("Avg. Sequential time: %.5fs\n",naive_time/ntrials);
 
-    printf("triplet ops: %e Gops\n\n", triplet_ops(n, seq_block_size)*10e-9);
-    printf("triplet avg. ops/sec: %e Gops/sec\n\n", triplet_ops(n, seq_block_size)*10e-9/(naive_time/ntrials));
-    printf("gemm ops: %e Gflops\n\n", 10e-9*n*n*n);
+    // printf("triplet ops: %e Gops\n\n", triplet_ops(n, conflict_block_size)*10e-9);
+    // printf("triplet avg. ops/sec: %e Gops/sec\n\n", triplet_ops(n, conflict_block_size)*10e-9/(naive_time/ntrials));
+    // printf("gemm ops: %e Gflops\n\n", 10e-9*n*n*n);
     // printf("gemm avg. Gflops/sec: %e\n", (10e-9*n*n*n));
 
     _mm_free(D);
