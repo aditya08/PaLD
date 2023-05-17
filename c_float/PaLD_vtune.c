@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
         memset(C1, 0, num_gen*sizeof(float));
         start = omp_get_wtime();
         // pald_triplet_L2_blocked(D, 1, n, C1, l1_block_size,l2_block_size);
-        pald_triplet_intrin(D, 1.f, n, C1, conflict_block_size, cohesion_block_size);
+        pald_triplet_intrin(D, 1.f, n, C1, conflict_block_size);
         // pald_triplet_intrin_openmp(D, 1.f, n, C1, l1_block_size);
         // pald_allz_experimental(D, 1, n, C1, l1_block_size);
         elapsed += omp_get_wtime() - start;

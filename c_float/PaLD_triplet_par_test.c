@@ -73,14 +73,14 @@ int main(int argc, char **argv) {
     //computing C with optimal block algorithm
     for(int i = 0; i < 3; ++i){
         memset(C1, 0, sizeof(float)*n*n);
-        pald_triplet_intrin(D, 1., n, C1, conflict_block_size, cohesion_block_size);
+        pald_triplet_intrin(D, 1., n, C1, conflict_block_size);
     }
     double start = 0., naive_time = 0., omp_time = 0.;
     for (int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
         //pald_triplet_naive(D, 1, n, C1);
-        pald_triplet_intrin(D, 1., n, C1, conflict_block_size, cohesion_block_size);
+        pald_triplet_intrin(D, 1., n, C1, conflict_block_size);
         // pald_triplet_L2_blocked(D, 1., n, C1, seq_block_size, 512);
         // pald_allz(D, 1, n, C1, 256);
         naive_time += omp_get_wtime() - start;

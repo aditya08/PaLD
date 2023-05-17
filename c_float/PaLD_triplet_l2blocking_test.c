@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ntrials; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         start = omp_get_wtime();
-        pald_triplet_intrin(D, 1, n, C1, conflict_block_size, cohesion_block_size);
+        pald_triplet_intrin(D, 1, n, C1, conflict_block_size);
         naive_time += omp_get_wtime() - start;
     }
 

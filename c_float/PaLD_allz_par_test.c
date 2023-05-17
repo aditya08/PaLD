@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
     // fwrite(D, sizeof(float), num_gen, f);
     // fclose(f);
     //computing C with optimal block algorithm
-    for(int i = 0; i < 3; ++i){
+    for(int i = 0; i < 0; ++i){
         memset(C1, 0, sizeof(float)*n*n);
         pald_allz_noties_nobeta_vecbranching(D, 1., n, C1, seq_block_size);
     }
@@ -86,9 +86,9 @@ int main(int argc, char **argv) {
         naive_time += omp_get_wtime() - start;
     }
 
-    for(int i = 0; i < 3; ++i){
+    for(int i = 0; i < 0; ++i){
         memset(C2, 0, sizeof(float)*n*n);
-        pald_allz_openmp_noties_nobeta_vecbranching(D, 1.0, n, C2, omp_block_size, nthreads);
+        pald_allz_openmp_noties_nobeta_vecbranching_numapartitioning(D, 1.0, n, C2, omp_block_size, nthreads);
     }
     //print_out(n, C1);
     for (int i = 0; i < ntrials; ++i){

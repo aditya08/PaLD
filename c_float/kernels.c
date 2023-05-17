@@ -625,7 +625,7 @@ void pald_allz_noties_nobeta_vecbranching(float* restrict D, float beta, int n, 
             }
             for (k = 0; k < block_size*block_size; ++k)
                 conflict_block[k] = 1.0f/conflict_block[k];
-            // print_matrix(n, n, conflict_block);
+            // print_matrix(block_size, block_size, conflict_block);
             conflict_loop_time += omp_get_wtime() - time_start;
             time_start = omp_get_wtime();
             // update cohesion values according to conflicts between X and Y
@@ -1166,6 +1166,8 @@ void pald_allz_openmp_noties_nobeta(float* restrict D, float beta, int n, float*
     _mm_free(conflict_block);
 }
 
+
+
 /*
 params
 D    in  distance matrix: D(x,y) is distance between x and y (symmetric,
@@ -1176,7 +1178,7 @@ n    in  number of points
 C    out cohesion matrix: C(x,z) is z's support for x
 
 Optimizations:
-OpenMP, no-ties, nobeta, vectorized loop branching, Blocking, Masking, Auto-vectorization with  64-byte aligned arrays.
+OpenMP, no-ties, nobeta, vectorized loop branching, Blocking, Masking, Auto-vectorization, integer conflict_block with  64-byte aligned arrays.
 */
 
 void pald_allz_openmp_noties_nobeta_vecbranching(float* restrict D, float beta, int n, float* restrict C, int block_size, int nthreads) {
@@ -1187,18 +1189,18 @@ void pald_allz_openmp_noties_nobeta_vecbranching(float* restrict D, float beta, 
     *       4. store conflict_block buffer as an int* type for faster increments -- but this requires one of two things: 1) a second float* buffer to hold 1./conflict_block or 2) on-the-fly floating-point casting and division. Latter is probably very slow.
     *
     */
-
+    double time_start = 0.0;
+    double memops_loop_time = 0.0, conflict_loop_time = 0.0, cohesion_loop_time = 0.0;
+    time_start = omp_get_wtime();
     // declare indices
     unsigned int x, y, z, i, j, k, xb, yb, ib;
     // pre-allocate buffers for conflict focus and distance blocks
     float * conflict_block = (float *) _mm_malloc(block_size * block_size * sizeof(float),VECALIGN);
     float * distance_block = (float *) _mm_malloc(block_size * block_size * sizeof(float),VECALIGN);
-
+    memops_loop_time += omp_get_wtime() - time_start;
 
     // initialize pointers for cache-block subcolumn vectors
     unsigned int y_block, x_block;
-    double time_start = 0.0;
-    double memops_loop_time = 0.0, conflict_loop_time = 0.0, cohesion_loop_time = 0.0;
     //up_left main block
     for (y = 0; y < n; y += block_size) {
         // loop over blocks of points X = (x,...,x+b-1)
@@ -1305,9 +1307,9 @@ void pald_allz_openmp_noties_nobeta_vecbranching(float* restrict D, float beta, 
 
     // printf("nties = %f\n", contains_tie);
 
-    printf("===========================================================\n");
+    printf("===================================================================\n");
     printf("Allz OpenMP noties + nobeta + vecbranching Loop Times\n");
-    printf("===========================================================\n");
+    printf("===================================================================\n");
 
     printf("memops loop time: %.5fs\n", memops_loop_time);
     printf("conflict focus size loop time: %.5fs\n", conflict_loop_time);
@@ -1318,6 +1320,349 @@ void pald_allz_openmp_noties_nobeta_vecbranching(float* restrict D, float beta, 
     _mm_free(conflict_block);
 }
 
+/*
+params
+D    in  distance matrix: D(x,y) is distance between x and y (symmetric,
+         but assumed to be stored in full)
+beta in  conflict focus parameter: z is in focus of (x,y) if
+         min(d(z,x),d(z,y)) <= beta * d(x,y)
+n    in  number of points
+C    out cohesion matrix: C(x,z) is z's support for x
+
+Optimizations:
+OpenMP, no-ties, nobeta, vectorized loop branching, Blocking, Masking, Auto-vectorization, integer conflict_block with  64-byte aligned arrays.
+*/
+
+void pald_allz_openmp_noties_nobeta_vecbranching_intconflictblock(float* restrict D, float beta, int n, float* restrict C, int block_size, int nthreads) {
+    /* TODO: Additional optimization strategies:
+    *       1. Handle diagonal blocks separately so that inner loop can be fully vectorized for off-diagonal blocks.
+    *       2. Add L1 blocking.
+    *       3. Handle non-powers of two input dimensions using another method/set of nested loop to handle the ``remainder''.
+    *       4. store conflict_block buffer as an int* type for faster increments -- but this requires one of two things: 1) a second float* buffer to hold 1./conflict_block or 2) on-the-fly floating-point casting and division. Latter is probably very slow.
+    *
+    */
+    double time_start = 0.0;
+    double memops_loop_time = 0.0, conflict_loop_time = 0.0, cohesion_loop_time = 0.0;
+    time_start = omp_get_wtime();
+    // declare indices
+    unsigned int x, y, z, i, j, k, xb, yb, ib;
+    // pre-allocate buffers for conflict focus and distance blocks
+    unsigned int * conflict_block_int = (unsigned int *) _mm_malloc(block_size * block_size * sizeof(unsigned int),VECALIGN);
+    float * conflict_block = (float *) _mm_malloc(block_size * block_size * sizeof(float),VECALIGN);
+    float * distance_block = (float *) _mm_malloc(block_size * block_size * sizeof(float),VECALIGN);
+    memops_loop_time += omp_get_wtime() - time_start;
+
+    // initialize pointers for cache-block subcolumn vectors
+    unsigned int y_block, x_block;
+    //up_left main block
+    for (y = 0; y < n; y += block_size) {
+        // loop over blocks of points X = (x,...,x+b-1)
+        y_block = (block_size < n - y ? block_size : n - y);
+        for (x = 0; x <= y; x += block_size) {
+            time_start = omp_get_wtime();
+            x_block = (block_size < n - x ? block_size : n - x);
+            for (j = 0; j < y_block; ++j) {
+                ib = (x == y ? j : x_block); // handle diagonal blocks
+                // distance_block(:,j) = D(x:x+xb,y+j) in off-diagonal case
+                memcpy(distance_block + j * x_block, D + x + (y + j) * n, ib * sizeof(float));
+            }
+
+            // compute block's conflict focus sizes by looping over all points z
+            memset(conflict_block_int, 0, block_size * block_size * sizeof(int)); // clear old values
+
+            memops_loop_time += omp_get_wtime() - time_start;
+            time_start = omp_get_wtime();
+            #pragma omp parallel for num_threads(nthreads) private(i, j, ib, z) reduction(+:conflict_block_int[:block_size*block_size]) schedule(static)
+            for (z = 0; z < n; ++z) {
+                float* DXz = D + x + z*n;
+                float* DYz = D + y + z*n;
+                for (j = 0; j < y_block; ++j) {
+                    if(x == y){
+                        for (i = 0; i < j; ++i) {
+                            if (DYz[j] <= distance_block[i + j * x_block] || DXz[i] <= distance_block[i + j * x_block]){
+                                ++conflict_block_int[i + j * x_block];
+                            }
+
+                        }
+                    }
+                    else{
+                        for (i = 0; i < x_block; ++i) {
+                            if (DYz[j] <= distance_block[i + j * x_block] || DXz[i] <= distance_block[i + j * x_block]){
+                                ++conflict_block_int[i + j * x_block];
+                            }
+
+                        }
+                    }
+                }
+            }
+            #pragma omp parallel for num_threads(nthreads)
+            for (k = 0; k < block_size*block_size; ++k)
+                conflict_block[k] = 1.0f/conflict_block_int[k];
+            // print_matrix(n, n, conflict_block);
+            conflict_loop_time += omp_get_wtime() - time_start;
+            time_start = omp_get_wtime();
+            #pragma omp parallel num_threads(nthreads) private(i, j, ib, z)
+            {
+                float *CXz, *CYz, *DXz, *DYz;
+                float z_supports_x;
+                float z_supports_y;
+                float z_supports_x_and_y;
+                float z_in_conflict_focus;
+                unsigned int mask_z_in_y_cutoff;
+                unsigned int mask_z_in_x_cutoff;
+
+                float CYz_reduction = 0.f;
+
+                #pragma omp for nowait schedule(static)
+                for (z = 0; z < n; ++z) {
+                    // loop over all (i,j) pairs in block
+                    DXz = D + x + z*n;
+                    DYz = D + y + z*n;
+                    CXz = C + x + z*n;
+                    CYz = C + y + z*n;
+                    for (j = 0; j < y_block; ++j) {
+                        CYz_reduction = 0.f;
+                        if(x == y){
+                            for (i = 0; i < j; ++i) {
+                                z_supports_x = DXz[i] < DYz[j];
+                                z_supports_y = DXz[i] > DYz[j];
+
+                                mask_z_in_x_cutoff = (DXz[i] <=  distance_block[i + j * x_block]);
+                                mask_z_in_y_cutoff = (DYz[j] <=  distance_block[i + j * x_block]);
+                                z_in_conflict_focus = mask_z_in_y_cutoff | mask_z_in_x_cutoff;
+
+                                CXz[i] +=  conflict_block[i + j * x_block]*z_in_conflict_focus*(z_supports_x);
+                                CYz_reduction +=  conflict_block[i + j * x_block]*z_in_conflict_focus*(z_supports_y);
+
+                            }
+                        }
+                        else{
+                            for (i = 0; i < x_block; ++i) {
+                                z_supports_x = DXz[i] < DYz[j];
+                                z_supports_y = DXz[i] > DYz[j];
+
+                                mask_z_in_x_cutoff = (DXz[i] <=  distance_block[i + j * x_block]);
+                                mask_z_in_y_cutoff = (DYz[j] <=  distance_block[i + j * x_block]);
+                                z_in_conflict_focus = mask_z_in_y_cutoff | mask_z_in_x_cutoff;
+
+                                CXz[i] +=  conflict_block[i + j * x_block]*z_in_conflict_focus*(z_supports_x);
+                                CYz_reduction +=  conflict_block[i + j * x_block]*z_in_conflict_focus*(z_supports_y);
+
+                            }
+                        }
+                        CYz[j] += CYz_reduction;
+                    }
+                }
+            }
+            cohesion_loop_time += omp_get_wtime() - time_start;
+        }
+    }
+
+    // printf("nties = %f\n", contains_tie);
+
+    printf("=================================================================================\n");
+    printf("Allz OpenMP noties + nobeta + vecbranching + int conflict block Loop Times\n");
+    printf("=================================================================================\n");
+
+    printf("memops loop time: %.5fs\n", memops_loop_time);
+    printf("conflict focus size loop time: %.5fs\n", conflict_loop_time);
+    printf("cohesion matrix update loop time: %.5fs\n\n", cohesion_loop_time);
+
+    // free up cache blocks
+    _mm_free(distance_block);
+    _mm_free(conflict_block_int);
+    _mm_free(conflict_block);
+}
+
+
+void pald_allz_openmp_noties_nobeta_vecbranching_numapartitioning(float* restrict D, float beta, int n, float* restrict C, int block_size, int nthreads) {
+    /* TODO: Additional optimization strategies:
+    *       1. Handle diagonal blocks separately so that inner loop can be fully vectorized for off-diagonal blocks.
+    *       2. Add L1 blocking.
+    *       3. Handle non-powers of two input dimensions using another method/set of nested loop to handle the ``remainder''.
+    *       4. store conflict_block buffer as an int* type for faster increments -- but this requires one of two things: 1) a second float* buffer to hold 1./conflict_block or 2) on-the-fly floating-point casting and division. Latter is probably very slow.
+    *
+    */
+
+    // declare indices
+    // pre-allocate buffers for conflict focus and distance blocks
+    float * conflict_block = (float *) _mm_malloc(block_size * block_size * sizeof(float),VECALIGN);
+    float * distance_block = (float *) _mm_malloc(block_size * block_size * sizeof(float),VECALIGN);
+
+    #pragma omp parallel shared(D, C, conflict_block, distance_block) num_threads(nthreads)
+    {
+        // initialize pointers for cache-block subcolumn vectors
+        double time_start = 0.0;
+        double memops_loop_time = 0.0, conflict_loop_time = 0.0, cohesion_loop_time = 0.0;
+        time_start = omp_get_wtime();
+        int tid = omp_get_thread_num();
+        unsigned int x, y, z, i, j, k, xb, yb, ib;
+        unsigned int y_block, x_block;
+        unsigned int zstart, zend, nremainder, ncols;
+        float *DXz, *DYz, *CYz, *CXz;
+        ncols = n / nthreads;
+        nremainder = n % nthreads;
+        ncols = (tid < nremainder) ? (ncols + 1) : ncols;
+        if(tid < nremainder){
+            zstart = tid * ncols;
+        }
+        else{
+            zstart = nremainder * (ncols + 1) + (tid - nremainder) * ncols;
+        }
+        zend = zstart + ncols;
+        // printf("[tid: %d]: zstart = %d, zend = %d\n", tid, zstart, zend);
+        // float * conflict_block_local = (float *) _mm_malloc(block_size * block_size * sizeof(float),VECALIGN);
+        float * local_D = (float *) _mm_malloc(ncols * n * sizeof(float),VECALIGN);
+        float * local_C = (float *) _mm_malloc(ncols * n * sizeof(float),VECALIGN);
+
+        memcpy(local_D, D + zstart*n, ncols*n*sizeof(float));
+        memset(local_C, 0, ncols * n * sizeof(float));
+        memops_loop_time += omp_get_wtime() - time_start;
+        //up_left main block
+        for (y = 0; y < n; y += block_size) {
+            // loop over blocks of points X = (x,...,x+b-1)
+            y_block = (block_size < n - y ? block_size : n - y);
+            for (x = 0; x <= y; x += block_size) {
+                x_block = (block_size < n - x ? block_size : n - x);
+                #pragma omp barrier
+                #pragma omp single
+                {
+                    time_start = omp_get_wtime();
+                    for (j = 0; j < y_block; ++j) {
+                        ib = (x == y ? j : x_block); // handle diagonal blocks
+                        // distance_block(:,j) = D(x:x+xb,y+j) in off-diagonal case
+                        memcpy(distance_block + j * x_block, D + x + (y + j) * n, ib * sizeof(float));
+                    }
+                    memset(conflict_block, 0, block_size * block_size * sizeof(float)); // clear old values
+                    memops_loop_time += omp_get_wtime() - time_start;
+                }
+                // memset(conflict_block_local, 0, block_size * block_size * sizeof(float)); // clear old values
+                // compute block's conflict focus sizes by looping over all points z
+                time_start = omp_get_wtime();
+                // #pragma omp parallel for num_threads(nthreads) private(i, j, ib, z) reduction(+:conflict_block[:block_size*block_size]) schedule(static)
+                #pragma omp for private(i, j, k, z, DXz, DYz) reduction(+:conflict_block[:block_size*block_size]) schedule(static,1)
+                for(k = 0; k < nthreads; ++k){
+                    for (z = zstart; z < zend; ++z) {
+                        // printf("[tid: %d]: zstart = %d, zend = %d, distance_block[0] = %.5f\n", tid, zstart, zend, distance_block[0]);
+                        DXz = local_D + x + (z-zstart)*n;
+                        DYz = local_D + y + (z-zstart)*n;
+                        for (j = 0; j < y_block; ++j) {
+                            if(x == y){
+                                for (i = 0; i < j; ++i) {
+                                    if (DYz[j] <= distance_block[i + j * x_block] || DXz[i] <= distance_block[i + j * x_block]){
+                                        ++conflict_block[i + j * x_block];
+                                    }
+
+                                }
+                            }
+                            else{
+                                for (i = 0; i < x_block; ++i) {
+                                    if (DYz[j] <= distance_block[i + j * x_block] || DXz[i] <= distance_block[i + j * x_block]){
+                                        ++conflict_block[i + j * x_block];
+                                    }
+
+                                }
+                            }
+                        }
+                    }
+                }
+                // #pragma omp master
+                // {
+                //     printf("tid = %d\n", tid);
+                //     print_matrix(block_size, block_size, conflict_block);
+                // }
+                // #pragma omp barrier
+                // // exit(-1);
+                // #pragma omp for reduction(+:conflict_block[:block_size*block_size]) schedule(static, 1)
+                // for(z = 0; z < nthreads; ++z){
+                //     // printf("[reduction tid: %d]\n", tid);
+                //     for (i = 0; i < block_size*block_size; ++i){
+                //         conflict_block[i] += conflict_block_local[i];
+                //     }
+                // }
+                #pragma omp for private(k)
+                for (k = 0; k < block_size*block_size; ++k)
+                    conflict_block[k] = 1.0f/conflict_block[k];
+                // #pragma omp single
+                // {
+                //     print_matrix(block_size, block_size, conflict_block);
+                // }
+                conflict_loop_time += omp_get_wtime() - time_start;
+                time_start = omp_get_wtime();
+                float z_supports_x;
+                float z_supports_y;
+                float z_supports_x_and_y;
+                float z_in_conflict_focus;
+                unsigned int mask_z_in_y_cutoff;
+                unsigned int mask_z_in_x_cutoff;
+
+                float CYz_reduction = 0.f;
+                for (z = zstart; z < zend; ++z) {
+                    // loop over all (i,j) pairs in block
+                    DXz = local_D + x + (z-zstart)*n;
+                    DYz = local_D + y + (z-zstart)*n;
+                    CXz = local_C + x + (z-zstart)*n;
+                    CYz = local_C + y + (z-zstart)*n;
+                    for (j = 0; j < y_block; ++j) {
+                        CYz_reduction = 0.f;
+                        if(x == y){
+                            for (i = 0; i < j; ++i) {
+                                z_supports_x = DXz[i] < DYz[j];
+                                z_supports_y = DXz[i] > DYz[j];
+
+                                mask_z_in_x_cutoff = (DXz[i] <=  distance_block[i + j * x_block]);
+                                mask_z_in_y_cutoff = (DYz[j] <=  distance_block[i + j * x_block]);
+                                z_in_conflict_focus = mask_z_in_y_cutoff | mask_z_in_x_cutoff;
+
+                                CXz[i] +=  conflict_block[i + j * x_block]*z_in_conflict_focus*(z_supports_x);
+                                CYz_reduction +=  conflict_block[i + j * x_block]*z_in_conflict_focus*(z_supports_y);
+
+                            }
+                        }
+                        else{
+                            for (i = 0; i < x_block; ++i) {
+                                z_supports_x = DXz[i] < DYz[j];
+                                z_supports_y = DXz[i] > DYz[j];
+
+                                mask_z_in_x_cutoff = (DXz[i] <=  distance_block[i + j * x_block]);
+                                mask_z_in_y_cutoff = (DYz[j] <=  distance_block[i + j * x_block]);
+                                z_in_conflict_focus = mask_z_in_y_cutoff | mask_z_in_x_cutoff;
+
+                                CXz[i] +=  conflict_block[i + j * x_block]*z_in_conflict_focus*(z_supports_x);
+                                CYz_reduction +=  conflict_block[i + j * x_block]*z_in_conflict_focus*(z_supports_y);
+
+                            }
+                        }
+                        CYz[j] += CYz_reduction;
+                    }
+                }
+                cohesion_loop_time += omp_get_wtime() - time_start;
+            }
+        }
+        //memcpy local_C's into C.
+        time_start = omp_get_wtime();
+        memcpy(C + zstart*n, local_C, n*ncols*sizeof(float));
+        _mm_free(local_C);
+        _mm_free(local_D);
+        memops_loop_time += omp_get_wtime() - time_start;
+        #pragma omp master
+        {
+            printf("===============================================================================\n");
+            printf("Allz OpenMP noties + nobeta + vecbranching + numa_partitioning Loop Times\n");
+            printf("===============================================================================\n");
+
+            printf("memops loop time: %.5fs\n", memops_loop_time);
+            printf("conflict focus size loop time: %.5fs\n", conflict_loop_time);
+            printf("cohesion matrix update loop time: %.5fs\n\n", cohesion_loop_time);
+        }
+    }
+    // printf("nties = %f\n", contains_tie);
+
+
+    // free up cache blocks
+    _mm_free(distance_block);
+    _mm_free(conflict_block);
+}
 
 /*
 params
@@ -3327,9 +3672,9 @@ void pald_triplet_intrin_powersoftwo(float *D, float beta, int n, float *C, int 
 
 }
 
-void pald_triplet_intrin(float *D, float beta, int n, float *C, int conflict_block_size, int cohesion_block_size){
+void pald_triplet_intrin(float *D, float beta, int n, float *C, int block_size){
     //TODO: Optimized sequential triplet code.
-    int block_size = conflict_block_size;
+    // int block_size = conflict_block_size;
     float* restrict conflict_matrix = (float *)  _mm_malloc(n * n * sizeof(float), VECALIGN);
     // memset(conflict_matrix, 0, n * n * sizeof(float));
     unsigned int* restrict conflict_matrix_int = (unsigned int*)  _mm_malloc(n * n * sizeof(unsigned int), VECALIGN);
@@ -3687,7 +4032,7 @@ void pald_triplet_intrin(float *D, float beta, int n, float *C, int conflict_blo
     float *cohesion_zx_block;
     float *cohesion_yz_block;
     float *cohesion_zy_block;
-    block_size = cohesion_block_size;
+    block_size /= 2;
 
     // float* restrict mask_xy_closest = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);
     // float* restrict mask_xz_closest = (float *) _mm_malloc(block_size * sizeof(float), VECALIGN);

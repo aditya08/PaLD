@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
         // pald_allz_openmp_noties_nobeta_vecbranching(D, 1.0, n, C2, allz_cache_size, 16);
         // pald_triplet_fewercompares(D, 1, n, C2, triplet_L1_cache_size);
         // pald_triplet(D, 1, n, C2, triplet_L1_cache_size);
-        pald_triplet_intrin(D, 1, n, C2, conflict_block_size, cohesion_block_size);
+        pald_triplet_intrin(D, 1, n, C2, conflict_block_size);
         // pald_triplet_L2_blocked(D, 1, n, C2, triplet_L1_cache_size, triplet_L2_cache_size);
         // pald_triplet_intrin_powersoftwo(D, 1., n, C2, triplet_L1_cache_size);
         // pald_triplet_largezblock(D, 1., n, C2, triplet_L1_cache_size, triplet_L2_cache_size);
