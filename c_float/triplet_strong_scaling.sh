@@ -6,7 +6,7 @@ unset KMP_AFFINITY
 while [ ${matrix_size} -lt 8193 ]
 do
     # echo "${matrix_size}"
-    ./PaLD_triplet_benchmark $matrix_size 256 128 5 2>&1 | tee -a ./logs/kahan/triplet_strong_scaling/sequential/triplet_matsize_${matrix_size}_ublk_256_cohblk_128_sequential_strong_scaling.txt
+    ./PaLD_triplet_benchmark $matrix_size 256 128 1 2>&1 | tee ./logs/kahan/triplet_strong_scaling/sequential/triplet_matsize_${matrix_size}_ublk_256_cohblk_128_sequential_strong_scaling.txt
 
     for conflict_block_size in 64 96 128 192 256
     do
@@ -16,7 +16,7 @@ do
             for nthreads in 2 4 8 16 32 #48
             do
                 # echo "${matrix_size} ${conflict_block_size} ${cohesion_block_size} ${nthreads} ${KMP_AFFINITY}"
-                ./PaLD_triplet_omp_benchmark $matrix_size $conflict_block_size $cohesion_block_size $nthreads 5 2>&1 | tee -a ./logs/kahan/triplet_strong_scaling/openmp/triplet_matsize_${matrix_size}_ublk_${conflict_block_size}_cohblk_${cohesion_block_size}_threads_${nthreads}_strong_scaling.txt
+                ./PaLD_triplet_omp_benchmark $matrix_size $conflict_block_size $cohesion_block_size $nthreads 1 2>&1 | tee ./logs/kahan/triplet_strong_scaling/openmp/triplet_matsize_${matrix_size}_ublk_${conflict_block_size}_cohblk_${cohesion_block_size}_threads_${nthreads}_strong_scaling.txt
                 sleep 2
             done
         done
@@ -39,7 +39,7 @@ do
             for nthreads in 2 4 8 16 32 #48
             do
                 # echo "${matrix_size} ${conflict_block_size} ${cohesion_block_size} ${nthreads} ${KMP_AFFINITY}"
-                ./PaLD_triplet_omp_benchmark $matrix_size $conflict_block_size $cohesion_block_size $nthreads 5 2>&1 | tee -a ./logs/kahan/triplet_strong_scaling/numa_openmp/triplet_numa_matsize_${matrix_size}_ublk_${conflict_block_size}_cohblk_${cohesion_block_size}_threads_${nthreads}_strong_scaling.txt
+                ./PaLD_triplet_omp_benchmark $matrix_size $conflict_block_size $cohesion_block_size $nthreads 1 2>&1 | tee ./logs/kahan/triplet_strong_scaling/numa_openmp/triplet_numa_matsize_${matrix_size}_ublk_${conflict_block_size}_cohblk_${cohesion_block_size}_threads_${nthreads}_strong_scaling.txt
                 sleep 1
             done
         done

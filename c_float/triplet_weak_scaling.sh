@@ -3,7 +3,7 @@ unset KMP_AFFINITY
 # sequential and openmp allz weak scaling runs (without numa-awareness)
 for matrix_size in 256 512 1024
 do
-    ./PaLD_triplet_benchmark $matrix_size 256 128 5 2>&1 | tee -a ./logs/kahan/triplet_weak_scaling/sequential/triplet_matsize_${matrix_size}_ublk_256_cohblk_128_sequential_weak_scaling.txt
+    ./PaLD_triplet_benchmark $matrix_size 256 128 1 2>&1 | tee ./logs/kahan/triplet_weak_scaling/sequential/triplet_matsize_${matrix_size}_ublk_256_cohblk_128_sequential_weak_scaling.txt
     # echo "${matrix_size}"
 
     for conflict_block_size in 64 96 128 192 256
@@ -14,7 +14,7 @@ do
             do
                 work=$(echo ${matrix_size} ${nthreads} | awk '{ print $1^(3)*$2 }')
                 omp_matrix_size=$(echo ${work} | awk '{ print int($1^(1/3) + 0.5) }')
-                ./PaLD_triplet_omp_benchmark $omp_matrix_size $conflict_block_size $cohesion_block_size $nthreads 5 2>&1 | tee -a ./logs/kahan/triplet_weak_scaling/openmp/triplet_matsize_${omp_matrix_size}__ublk_${conflict_block_size}_cohblk_${cohesion_block_size}_threads_${nthreads}_weak_scaling.txt
+                ./PaLD_triplet_omp_benchmark $omp_matrix_size $conflict_block_size $cohesion_block_size $nthreads 1 2>&1 | tee ./logs/kahan/triplet_weak_scaling/openmp/triplet_matsize_${omp_matrix_size}__ublk_${conflict_block_size}_cohblk_${cohesion_block_size}_threads_${nthreads}_weak_scaling.txt
                 #echo "${nthreads} ${omp_matrix_size} ${conflict_block_size} ${cohesion_block_size}"
                 sleep 2
             done
@@ -36,7 +36,7 @@ do
             do
                 work=$(echo ${matrix_size} ${nthreads} | awk '{ print $1^(3)*$2 }')
                 omp_matrix_size=$(echo ${work} | awk '{ print int($1^(1/3) + 0.5) }')
-                ./PaLD_triplet_omp_benchmark $omp_matrix_size $conflict_block_size $cohesion_block_size $nthreads 5 2>&1 | tee -a ./logs/kahan/triplet_weak_scaling/numa_openmp/triplet_matsize_${omp_matrix_size}_ublk_${conflict_block_size}_cohblk_${cohesion_block_size}_threads_${nthreads}_weak_scaling.txt
+                ./PaLD_triplet_omp_benchmark $omp_matrix_size $conflict_block_size $cohesion_block_size $nthreads 1 2>&1 | tee ./logs/kahan/triplet_weak_scaling/numa_openmp/triplet_matsize_${omp_matrix_size}_ublk_${conflict_block_size}_cohblk_${cohesion_block_size}_threads_${nthreads}_weak_scaling.txt
                 #echo "${nthreads} ${omp_matrix_size} ${conflict_block_size} ${cohesion_block_size}"
                 sleep 2
             done

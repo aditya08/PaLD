@@ -6,14 +6,14 @@ unset KMP_AFFINITY
 while [ ${matrix_size} -lt 8193 ]
 do
     echo "${matrix_size}"
-    ./PaLD_allz_benchmark $matrix_size 256 5 2>&1 | tee -a ./logs/kahan/allz_strong_scaling/sequential/allz_matsize_${matrix_size}_blk_256_sequential_strong_scaling.txt
+    ./PaLD_allz_benchmark $matrix_size 256 1 2>&1 | tee ./logs/kahan/allz_strong_scaling/sequential/allz_matsize_${matrix_size}_blk_256_sequential_strong_scaling.txt
 
     while [ ${omp_block_size} -lt 257 ]
     do
         for nthreads in 2 4 8 16 32 #48
         do
             # echo "${matrix_size} ${omp_block_size} ${nthreads} ${KMP_AFFINITY}"
-            ./PaLD_allz_omp_benchmark $matrix_size $omp_block_size $nthreads 5 2>&1 | tee -a ./logs/kahan/allz_strong_scaling/openmp/allz_matsize_${matrix_size}_blk_${omp_block_size}_threads_${nthreads}_strong_scaling.txt
+            ./PaLD_allz_omp_benchmark $matrix_size $omp_block_size $nthreads 1 2>&1 | tee ./logs/kahan/allz_strong_scaling/openmp/allz_matsize_${matrix_size}_blk_${omp_block_size}_threads_${nthreads}_strong_scaling.txt
             sleep 2
         done
         omp_block_size=`expr $omp_block_size + 32`
@@ -33,7 +33,7 @@ do
         for nthreads in 2 4 8 16 32 #48
         do
             # echo "${matrix_size} ${omp_block_size} ${nthreads} ${KMP_AFFINITY}"
-            ./PaLD_allz_omp_benchmark $matrix_size $omp_block_size $nthreads 5 2>&1 | tee -a ./logs/kahan/allz_strong_scaling/numa_openmp/allz_numa_matsize_${matrix_size}_blk_${omp_block_size}_threads_${nthreads}_strong_scaling.txt
+            ./PaLD_allz_omp_benchmark $matrix_size $omp_block_size $nthreads 1 2>&1 | tee ./logs/kahan/allz_strong_scaling/numa_openmp/allz_numa_matsize_${matrix_size}_blk_${omp_block_size}_threads_${nthreads}_strong_scaling.txt
             sleep 2
         done
         omp_block_size=`expr $omp_block_size + 32`

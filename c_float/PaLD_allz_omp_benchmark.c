@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
         // start = omp_get_wtime();
         // pald_triplet_blocked(D, 1, n, C2, nthreads);
         //pald_triplet_naive(D, 1, n, C2);
-        pald_allz_openmp_noties_nobeta_vecbranching_numapartitioning(D, 1.0, n, C1, omp_block_size, nthreads);
+        pald_allz_openmp_noties_nobeta_vecbranching(D, 1.0, n, C1, omp_block_size, nthreads);
         // pald_allz_openmp_noties_nobeta_vecbranching(D, 1.0, n, C1, omp_block_size, nthreads);
         memset(C1, 0, sizeof(float)*n*n);
         //pald_triplet_naive_openmp(D, 1, n, C2, nthreads);
@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
         start = omp_get_wtime();
         // pald_triplet_blocked(D, 1, n, C2, nthreads);
         //pald_triplet_naive(D, 1, n, C2);
-        pald_allz_openmp_noties_nobeta_vecbranching_numapartitioning(D, 1.0, n, C1, omp_block_size, nthreads);
+        pald_allz_openmp_noties_nobeta_vecbranching(D, 1.0, n, C1, omp_block_size, nthreads);
         // pald_allz_openmp_noties_nobeta_vecbranching(D, 1.0, n, C1, omp_block_size, nthreads);
         //pald_triplet_naive_openmp(D, 1, n, C2, nthreads);
         omp_time += omp_get_wtime() - start;

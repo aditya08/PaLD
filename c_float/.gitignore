@@ -9,6 +9,7 @@ PaLD_triplet_omp_benchmark
 PaLD_triplet_benchmark
 PaLD_allz_benchmark
 PaLD_allz_omp_benchmark
+PaLD_allz_omp_explicitnuma_benchmark
 PaLD_allz_par_test
 *.err
 *.o
